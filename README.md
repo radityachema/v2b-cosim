@@ -4,7 +4,7 @@ A co-simulation framework for Vehicle-to-Building (V2B) energy management resear
 
 The framework separates concerns into two independently replaceable layers connected by a one-way physical interface. Swap out any controller without touching the other layer or the evaluation code.
 
-![Architecture](docs/architecture.svg)
+![Architecture](docs/system_diagram.svg)
 
 ## Architecture
 
