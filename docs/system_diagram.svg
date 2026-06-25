@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 580"
+     font-family="Arial, sans-serif" font-size="11">
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="black"/>
+    </marker>
+  </defs>
+
+  <rect width="700" height="580" fill="white"/>
+
+  <!-- ══════════════════════ LAYER 1 ══════════════════════ -->
+  <rect x="175" y="48" width="370" height="168" rx="3"
+        fill="white" stroke="black" stroke-width="2"/>
+  <text x="360" y="68" text-anchor="middle" font-size="13" font-weight="bold">LAYER 1 — Fleet Simulation</text>
+  <line x1="175" y1="76" x2="545" y2="76" stroke="black" stroke-width="0.8"/>
+
+  <text x="187" y="94"  font-weight="bold">Process</text>
+  <text x="280" y="94" >Forward simulation using a heuristic rule</text>
+
+  <text x="187" y="114" font-weight="bold">Itineraries</text>
+  <text x="280" y="114">Fixed itineraries · two depot locations</text>
+
+  <text x="187" y="134" font-weight="bold">Charging</text>
+  <text x="280" y="134">Charge when battery below safety threshold</text>
+
+  <text x="187" y="154" font-weight="bold">Discharge</text>
+  <text x="280" y="154">Discharge at fixed rate during idle window</text>
+
+  <text x="187" y="174" font-weight="bold">Min. Charge</text>
+  <text x="280" y="174">Next-trip energy need + discharge reserve</text>
+
+  <text x="187" y="198" font-size="10" fill="#777" font-style="italic">Charge rate · Battery capacity · Charger count per depot</text>
+
+  <!-- Input 1: Road Network + Trip Records -->
+  <rect x="5" y="53" width="150" height="38" rx="2"
+        fill="white" stroke="black" stroke-width="1"/>
+  <text x="80" y="69"  text-anchor="middle">Road Network</text>
+  <text x="80" y="85"  text-anchor="middle">+ Trip Records</text>
+  <line x1="155" y1="72" x2="173" y2="96" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Input 2: Fleet Configuration -->
+  <rect x="5" y="110" width="150" height="52" rx="2"
+        fill="white" stroke="black" stroke-width="1"/>
+  <text x="80" y="124" text-anchor="middle">Fleet Configuration</text>
+  <text x="80" y="140" text-anchor="middle">Capacity · Rate</text>
+  <text x="80" y="156" text-anchor="middle">Charger Count</text>
+  <line x1="155" y1="136" x2="173" y2="134" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════ INTER-LAYER SIGNAL ══════════════════════ -->
+  <line x1="360" y1="216" x2="360" y2="310" stroke="black" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="370" y="248" font-size="11" font-weight="bold">Vehicle Power Availability</text>
+  <text x="370" y="265" font-size="10" fill="#777">per depot zone · capped by charger count</text>
+  <text x="370" y="281" font-size="10" fill="#777">time-series passed to Layer 2</text>
+
+  <!-- ══════════════════════ LAYER 2 ══════════════════════ -->
+  <rect x="175" y="314" width="370" height="184" rx="3"
+        fill="white" stroke="black" stroke-width="2"/>
+  <text x="360" y="334" text-anchor="middle" font-size="13" font-weight="bold">LAYER 2 — Building Energy Model</text>
+  <text x="360" y="350" text-anchor="middle" font-size="10" font-style="italic">day-ahead optimisation · perfect foresight</text>
+  <line x1="175" y1="357" x2="545" y2="357" stroke="black" stroke-width="0.8"/>
+
+  <text x="187" y="376" font-weight="bold">Model</text>
+  <text x="280" y="376">First-order thermal mass per building</text>
+
+  <text x="187" y="396" font-weight="bold">Decisions</text>
+  <text x="280" y="396">Setpoint · HVAC power · Vehicle power used</text>
+
+  <text x="187" y="416" font-weight="bold">Objective</text>
+  <text x="280" y="416">Minimise aggregate peak electrical demand</text>
+
+  <text x="187" y="436" font-weight="bold">Comfort</text>
+  <text x="280" y="436">Indoor temperature bounded to comfort range</text>
+
+  <text x="187" y="456" font-weight="bold">Scenarios</text>
+  <text x="280" y="456">Baseline · V2B only · HVAC only · Joint</text>
+
+  <text x="187" y="474" font-size="10" fill="#777" font-style="italic">Synthetic outdoor temperature · occupancy ceiling (fixed schedule)</text>
+  <text x="187" y="489" font-size="10" fill="#777" font-style="italic">Indoor temperature evolves via RC dynamics each timestep</text>
+
+  <!-- Input 3: Building Electricity Records -->
+  <rect x="5" y="400" width="150" height="38" rx="2"
+        fill="white" stroke="black" stroke-width="1"/>
+  <text x="80" y="416" text-anchor="middle">Building Electricity</text>
+  <text x="80" y="432" text-anchor="middle">Records</text>
+  <line x1="155" y1="419" x2="173" y2="419" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════ OUTPUT ══════════════════════ -->
+  <line x1="360" y1="498" x2="360" y2="538" stroke="black" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="175" y="541" width="370" height="34" rx="2"
+        fill="white" stroke="black" stroke-width="1.5"/>
+  <text x="360" y="557" text-anchor="middle" font-size="12" font-weight="bold">Electrical Load Profiles  (4 scenarios)</text>
+  <text x="360" y="570" text-anchor="middle" font-size="10">Setpoint · Indoor Temperature · HVAC · Vehicle Power · Grid Draw</text>
+
+</svg>
