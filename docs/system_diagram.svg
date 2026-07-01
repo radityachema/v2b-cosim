@@ -1,97 +1,242 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 580"
-     font-family="Arial, sans-serif" font-size="11">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="615"
+     font-family="system-ui, -apple-system, Arial, sans-serif">
 
   <defs>
-    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="black"/>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#444"/>
+    </marker>
+    <marker id="arr-iface" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#8a6200"/>
+    </marker>
+    <marker id="arr-eval" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#4a3570"/>
     </marker>
   </defs>
 
-  <rect width="700" height="580" fill="white"/>
+  <rect width="760" height="615" fill="#f6f6f6"/>
 
-  <!-- ══════════════════════ LAYER 1 ══════════════════════ -->
-  <rect x="175" y="48" width="370" height="168" rx="3"
-        fill="white" stroke="black" stroke-width="2"/>
-  <text x="360" y="68" text-anchor="middle" font-size="13" font-weight="bold">LAYER 1 — Fleet Simulation</text>
-  <line x1="175" y1="76" x2="545" y2="76" stroke="black" stroke-width="0.8"/>
+  <!-- ── runner outer box ─────────────────────────── -->
+  <rect x="10" y="10" width="740" height="460" rx="7"
+        fill="none" stroke="#c0c0c0" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="22" y="24" fill="#b0b0b0" font-size="9" font-style="italic">runner / cosim.py</text>
 
-  <text x="187" y="94"  font-weight="bold">Process</text>
-  <text x="280" y="94" >Forward simulation using a heuristic rule</text>
 
-  <text x="187" y="114" font-weight="bold">Itineraries</text>
-  <text x="280" y="114">Fixed itineraries · two depot locations</text>
+  <!-- ═══════════════════════════════════════════════
+       FLEET LAYER
+  ════════════════════════════════════════════════════ -->
+  <rect x="20" y="22" width="720" height="188" rx="5"
+        fill="white" stroke="#1e3a5f" stroke-width="1.8"/>
 
-  <text x="187" y="134" font-weight="bold">Charging</text>
-  <text x="280" y="134">Charge when battery below safety threshold</text>
+  <!-- header -->
+  <rect x="20" y="22" width="720" height="30" rx="5" fill="#1e3a5f"/>
+  <rect x="20" y="38"  width="720" height="14" fill="#1e3a5f"/>
+  <text x="380" y="43" text-anchor="middle" fill="white"
+        font-size="12" font-weight="700" letter-spacing="2">FLEET LAYER</text>
 
-  <text x="187" y="154" font-weight="bold">Discharge</text>
-  <text x="280" y="154">Discharge at fixed rate during idle window</text>
+  <!-- column backgrounds -->
+  <rect x="20"  y="52" width="215" height="158" fill="#edf2f8"/>
+  <rect x="235" y="52" width="310" height="158" fill="#ffffff"/>
+  <rect x="545" y="52" width="195" height="158" fill="#f4f4f4"/>
 
-  <text x="187" y="174" font-weight="bold">Min. Charge</text>
-  <text x="280" y="174">Next-trip energy need + discharge reserve</text>
+  <!-- column dividers -->
+  <line x1="235" y1="52" x2="235" y2="210" stroke="#ccc" stroke-width="1"/>
+  <line x1="545" y1="52" x2="545" y2="210" stroke="#ccc" stroke-width="1"/>
 
-  <text x="187" y="198" font-size="10" fill="#777" font-style="italic">Charge rate · Battery capacity · Charger count per depot</text>
+  <!-- column headers -->
+  <text x="127" y="67" text-anchor="middle" fill="#1e3a5f"
+        font-size="9" font-weight="700" letter-spacing="1">INPUTS</text>
+  <text x="390" y="67" text-anchor="middle" fill="#333"
+        font-size="9" font-weight="700" letter-spacing="1">CONTROLLER</text>
+  <text x="642" y="67" text-anchor="middle" fill="#333"
+        font-size="9" font-weight="700" letter-spacing="1">OUTPUT</text>
 
-  <!-- Input 1: Road Network + Trip Records -->
-  <rect x="5" y="53" width="150" height="38" rx="2"
-        fill="white" stroke="black" stroke-width="1"/>
-  <text x="80" y="69"  text-anchor="middle">Road Network</text>
-  <text x="80" y="85"  text-anchor="middle">+ Trip Records</text>
-  <line x1="155" y1="72" x2="173" y2="96" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+  <!-- fleet inputs -->
+  <circle cx="35" cy="87"  r="2.5" fill="#1e3a5f"/>
+  <text   x="43"  y="91"  fill="#222" font-size="11">geo info</text>
+  <circle cx="35" cy="108" r="2.5" fill="#1e3a5f"/>
+  <text   x="43"  y="112" fill="#222" font-size="11">ride-hail demand</text>
+  <circle cx="35" cy="129" r="2.5" fill="#1e3a5f"/>
+  <text   x="43"  y="133" fill="#222" font-size="11">battery config</text>
 
-  <!-- Input 2: Fleet Configuration -->
-  <rect x="5" y="110" width="150" height="52" rx="2"
-        fill="white" stroke="black" stroke-width="1"/>
-  <text x="80" y="124" text-anchor="middle">Fleet Configuration</text>
-  <text x="80" y="140" text-anchor="middle">Capacity · Rate</text>
-  <text x="80" y="156" text-anchor="middle">Charger Count</text>
-  <line x1="155" y1="136" x2="173" y2="134" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+  <!-- input → controller -->
+  <line x1="230" y1="120" x2="250" y2="120" stroke="#666"
+        stroke-width="1.2" marker-end="url(#arr)"/>
 
-  <!-- ══════════════════════ INTER-LAYER SIGNAL ══════════════════════ -->
-  <line x1="360" y1="216" x2="360" y2="310" stroke="black" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="370" y="248" font-size="11" font-weight="bold">Vehicle Power Availability</text>
-  <text x="370" y="265" font-size="10" fill="#777">per depot zone · capped by charger count</text>
-  <text x="370" y="281" font-size="10" fill="#777">time-series passed to Layer 2</text>
+  <!-- pluggable controller box (dashed) -->
+  <rect x="252" y="70" width="284" height="130" rx="4"
+        fill="white" stroke="#555" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <rect x="257" y="65" width="60" height="13" rx="3" fill="#d94f00"/>
+  <text x="287" y="75" text-anchor="middle" fill="white"
+        font-size="8" font-weight="700">pluggable</text>
+  <text x="394" y="94" text-anchor="middle" fill="#111"
+        font-size="11.5" font-weight="700">FleetSimulator</text>
+  <line x1="258" y1="101" x2="530" y2="101" stroke="#e4e4e4" stroke-width="1"/>
+  <circle cx="264" cy="117" r="2.2" fill="#444"/>
+  <text   x="272"  y="121" fill="#444" font-size="10.5">accept / reject  (binary)</text>
+  <circle cx="264" cy="136" r="2.2" fill="#444"/>
+  <text   x="272"  y="140" fill="#444" font-size="10.5">charging rate  (kW, when idle)</text>
+  <circle cx="264" cy="155" r="2.2" fill="#b0b0b0"/>
+  <text   x="272"  y="159" fill="#999" font-size="10" font-style="italic">route: derived from accepted requests</text>
 
-  <!-- ══════════════════════ LAYER 2 ══════════════════════ -->
-  <rect x="175" y="314" width="370" height="184" rx="3"
-        fill="white" stroke="black" stroke-width="2"/>
-  <text x="360" y="334" text-anchor="middle" font-size="13" font-weight="bold">LAYER 2 — Building Energy Model</text>
-  <text x="360" y="350" text-anchor="middle" font-size="10" font-style="italic">day-ahead optimisation · perfect foresight</text>
-  <line x1="175" y1="357" x2="545" y2="357" stroke="black" stroke-width="0.8"/>
+  <!-- controller → output -->
+  <line x1="538" y1="120" x2="548" y2="120" stroke="#666"
+        stroke-width="1.2" marker-end="url(#arr)"/>
 
-  <text x="187" y="376" font-weight="bold">Model</text>
-  <text x="280" y="376">First-order thermal mass per building</text>
+  <!-- fleet output -->
+  <text x="642" y="97"  text-anchor="middle" fill="#1e3a5f"
+        font-size="11.5" font-weight="700">P_v2b(t)</text>
+  <text x="642" y="113" text-anchor="middle" fill="#666" font-size="10">DataFrame</text>
+  <text x="642" y="129" text-anchor="middle" fill="#666" font-size="10">timestep × building_id</text>
+  <text x="642" y="145" text-anchor="middle" fill="#666" font-size="10">values: kW  (≥ 0)</text>
+  <text x="642" y="161" text-anchor="middle" fill="#aaa"
+        font-size="9.5" font-style="italic">upper bound, not commitment</text>
 
-  <text x="187" y="396" font-weight="bold">Decisions</text>
-  <text x="280" y="396">Setpoint · HVAC power · Vehicle power used</text>
 
-  <text x="187" y="416" font-weight="bold">Objective</text>
-  <text x="280" y="416">Minimise aggregate peak electrical demand</text>
+  <!-- ── INTERFACE ──────────────────────────────────── -->
+  <!-- route: fleet output-right → bend down → center → interface box -->
+  <line x1="642" y1="213" x2="642" y2="227" stroke="#8a6200" stroke-width="1.5"/>
+  <line x1="380" y1="227" x2="642" y2="227" stroke="#8a6200" stroke-width="1.5"/>
+  <line x1="380" y1="227" x2="380" y2="237" stroke="#8a6200"
+        stroke-width="1.5" marker-end="url(#arr-iface)"/>
 
-  <text x="187" y="436" font-weight="bold">Comfort</text>
-  <text x="280" y="436">Indoor temperature bounded to comfort range</text>
+  <rect x="244" y="215" width="272" height="28" rx="4"
+        fill="#fffbee" stroke="#c09010" stroke-width="1.4"/>
+  <text x="380" y="228" text-anchor="middle" fill="#7a5500"
+        font-size="10" font-weight="700">interface · v2b_signal.validate()</text>
+  <text x="380" y="240" text-anchor="middle" fill="#9a7500"
+        font-size="8.5">schema · non-negative · uniform DatetimeIndex</text>
 
-  <text x="187" y="456" font-weight="bold">Scenarios</text>
-  <text x="280" y="456">Baseline · V2B only · HVAC only · Joint</text>
+  <!-- interface → building layer -->
+  <line x1="380" y1="245" x2="380" y2="257" stroke="#8a6200"
+        stroke-width="1.5" marker-end="url(#arr-iface)"/>
 
-  <text x="187" y="474" font-size="10" fill="#777" font-style="italic">Synthetic outdoor temperature · occupancy ceiling (fixed schedule)</text>
-  <text x="187" y="489" font-size="10" fill="#777" font-style="italic">Indoor temperature evolves via RC dynamics each timestep</text>
 
-  <!-- Input 3: Building Electricity Records -->
-  <rect x="5" y="400" width="150" height="38" rx="2"
-        fill="white" stroke="black" stroke-width="1"/>
-  <text x="80" y="416" text-anchor="middle">Building Electricity</text>
-  <text x="80" y="432" text-anchor="middle">Records</text>
-  <line x1="155" y1="419" x2="173" y2="419" stroke="black" stroke-width="1" marker-end="url(#arr)"/>
+  <!-- ═══════════════════════════════════════════════
+       BUILDING LAYER
+  ════════════════════════════════════════════════════ -->
+  <rect x="20" y="257" width="720" height="210" rx="5"
+        fill="white" stroke="#1a3d2b" stroke-width="1.8"/>
 
-  <!-- ══════════════════════ OUTPUT ══════════════════════ -->
-  <line x1="360" y1="498" x2="360" y2="538" stroke="black" stroke-width="1.5" marker-end="url(#arr)"/>
-  <rect x="175" y="541" width="370" height="34" rx="2"
-        fill="white" stroke="black" stroke-width="1.5"/>
-  <text x="360" y="557" text-anchor="middle" font-size="12" font-weight="bold">Electrical Load Profiles  (4 scenarios)</text>
-  <text x="360" y="570" text-anchor="middle" font-size="10">Setpoint · Indoor Temperature · HVAC · Vehicle Power · Grid Draw</text>
+  <!-- header -->
+  <rect x="20" y="257" width="720" height="30" rx="5" fill="#1a3d2b"/>
+  <rect x="20" y="273"  width="720" height="14" fill="#1a3d2b"/>
+  <text x="380" y="278" text-anchor="middle" fill="white"
+        font-size="12" font-weight="700" letter-spacing="2">BUILDING LAYER</text>
+
+  <!-- column backgrounds -->
+  <rect x="20"  y="287" width="215" height="180" fill="#edf5f0"/>
+  <rect x="235" y="287" width="310" height="180" fill="#ffffff"/>
+  <rect x="545" y="287" width="195" height="180" fill="#f4f4f4"/>
+
+  <!-- column dividers -->
+  <line x1="235" y1="287" x2="235" y2="467" stroke="#ccc" stroke-width="1"/>
+  <line x1="545" y1="287" x2="545" y2="467" stroke="#ccc" stroke-width="1"/>
+
+  <!-- column headers -->
+  <text x="127" y="302" text-anchor="middle" fill="#1a3d2b"
+        font-size="9" font-weight="700" letter-spacing="1">INPUTS</text>
+  <text x="390" y="302" text-anchor="middle" fill="#333"
+        font-size="9" font-weight="700" letter-spacing="1">OPTIMIZER</text>
+  <text x="642" y="302" text-anchor="middle" fill="#333"
+        font-size="9" font-weight="700" letter-spacing="1">OUTPUT</text>
+
+  <!-- building inputs -->
+  <circle cx="35" cy="319" r="2.5" fill="#1a3d2b"/>
+  <text   x="43"  y="323" fill="#222" font-size="11">weather  (T_out)</text>
+  <circle cx="35" cy="339" r="2.5" fill="#1a3d2b"/>
+  <text   x="43"  y="343" fill="#222" font-size="11">occupancy schedule</text>
+  <circle cx="35" cy="359" r="2.5" fill="#1a3d2b"/>
+  <text   x="43"  y="363" fill="#222" font-size="11">building info  (RC params)</text>
+  <circle cx="35" cy="379" r="2.5" fill="#1a3d2b"/>
+  <text   x="43"  y="383" fill="#222" font-size="11">comfort range</text>
+  <!-- P_v2b highlighted -->
+  <rect x="26" y="391" width="202" height="20" rx="3"
+        fill="#fff5c8" stroke="#c09010" stroke-width="1"/>
+  <circle cx="35" cy="401" r="2.5" fill="#8a6200"/>
+  <text   x="43"  y="405" fill="#7a5000" font-size="11" font-weight="600">P_v2b(t)  ← interface</text>
+
+  <!-- input → optimizer -->
+  <line x1="230" y1="368" x2="250" y2="368" stroke="#666"
+        stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- pluggable optimizer box (dashed) -->
+  <rect x="252" y="308" width="284" height="150" rx="4"
+        fill="white" stroke="#555" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <rect x="257" y="303" width="60" height="13" rx="3" fill="#d94f00"/>
+  <text x="287" y="313" text-anchor="middle" fill="white"
+        font-size="8" font-weight="700">pluggable</text>
+  <text x="394" y="332" text-anchor="middle" fill="#111"
+        font-size="11.5" font-weight="700">BuildingOptimizer</text>
+  <line x1="258" y1="339" x2="530" y2="339" stroke="#e4e4e4" stroke-width="1"/>
+  <circle cx="264" cy="356" r="2.2" fill="#444"/>
+  <text   x="272"  y="360" fill="#444" font-size="10.5">temperature setpoint  (°C)</text>
+  <circle cx="264" cy="376" r="2.2" fill="#444"/>
+  <text   x="272"  y="380" fill="#444" font-size="10.5">RC thermal model</text>
+  <text   x="272"  y="395" fill="#999" font-size="9.5" font-style="italic">  T[t+1] = (1−a)·T[t] + a·T_out[t] − b·p_hvac[t]</text>
+  <circle cx="264" cy="415" r="2.2" fill="#444"/>
+  <text   x="272"  y="419" fill="#444" font-size="10.5">constrained by comfort_range × occupancy</text>
+
+  <!-- optimizer → output -->
+  <line x1="538" y1="368" x2="548" y2="368" stroke="#666"
+        stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- building output -->
+  <text x="642" y="327" text-anchor="middle" fill="#1a3d2b"
+        font-size="11.5" font-weight="700">results</text>
+  <text x="642" y="342" text-anchor="middle" fill="#666" font-size="10">DataFrame</text>
+  <line x1="556" y1="349" x2="728" y2="349" stroke="#e8e8e8" stroke-width="1"/>
+  <text x="642" y="364" text-anchor="middle" fill="#666" font-size="10">p_hvac_kw</text>
+  <text x="642" y="380" text-anchor="middle" fill="#666" font-size="10">p_v2b_used_kw</text>
+  <text x="642" y="396" text-anchor="middle" fill="#666" font-size="10">p_grid_kw</text>
+  <text x="642" y="412" text-anchor="middle" fill="#666" font-size="10">t_indoor_c</text>
+  <text x="642" y="428" text-anchor="middle" fill="#666" font-size="10">t_setpoint_c</text>
+
+
+  <!-- ── EVALUATION ──────────────────────────────────── -->
+  <!-- route: building output-right → bend down → center → eval box -->
+  <line x1="642" y1="470" x2="642" y2="487" stroke="#4a3570" stroke-width="1.5"/>
+  <line x1="380" y1="487" x2="642" y2="487" stroke="#4a3570" stroke-width="1.5"/>
+  <line x1="380" y1="487" x2="380" y2="495" stroke="#4a3570"
+        stroke-width="1.5" marker-end="url(#arr-eval)"/>
+
+  <rect x="20" y="495" width="720" height="110" rx="5"
+        fill="white" stroke="#4a3570" stroke-width="1.8"/>
+
+  <!-- eval header -->
+  <rect x="20" y="495" width="720" height="28" rx="5" fill="#4a3570"/>
+  <rect x="20" y="511"  width="720" height="12" fill="#4a3570"/>
+  <text x="380" y="515" text-anchor="middle" fill="white"
+        font-size="11" font-weight="700" letter-spacing="1.5">EVALUATION  ·  metrics.py</text>
+
+  <!-- sub-section dividers -->
+  <line x1="260" y1="523" x2="260" y2="605" stroke="#e0e0e0" stroke-width="1"/>
+  <line x1="500" y1="523" x2="500" y2="605" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- fleet metrics -->
+  <text x="140" y="537" text-anchor="middle" fill="#4a3570"
+        font-size="9" font-weight="700" letter-spacing="1">FLEET</text>
+  <circle cx="38"  cy="553" r="2.2" fill="#4a3570"/>
+  <text   x="46"   y="557" fill="#333" font-size="10.5">demand fulfillment  (%)</text>
+  <circle cx="38"  cy="572" r="2.2" fill="#4a3570"/>
+  <text   x="46"   y="576" fill="#333" font-size="10.5">V2B energy delivered  (kWh)</text>
+
+  <!-- cross-layer metric -->
+  <text x="380" y="537" text-anchor="middle" fill="#4a3570"
+        font-size="9" font-weight="700" letter-spacing="1">CROSS-LAYER</text>
+  <rect x="278" y="545" width="204" height="38" rx="3"
+        fill="#ede8f5" stroke="#4a3570" stroke-width="1"/>
+  <text x="380" y="560" text-anchor="middle" fill="#3d2860"
+        font-size="10.5" font-weight="600">V2B utilization rate  (%)</text>
+  <text x="380" y="577" text-anchor="middle" fill="#6b4fa8"
+        font-size="9.5">= P_consumed / P_offered</text>
+
+  <!-- building metrics -->
+  <text x="614" y="537" text-anchor="middle" fill="#4a3570"
+        font-size="9" font-weight="700" letter-spacing="1">BUILDING</text>
+  <circle cx="514" cy="553" r="2.2" fill="#4a3570"/>
+  <text   x="522"  y="557" fill="#333" font-size="10.5">comfort deviation  (°C·h)</text>
+  <circle cx="514" cy="572" r="2.2" fill="#4a3570"/>
+  <text   x="522"  y="576" fill="#333" font-size="10.5">peak demand reduction  (kW)</text>
 
 </svg>
