@@ -40,7 +40,6 @@ runner.py           minimal end-to-end loop (synthetic data)
 data/loaders/        Chicago taxi + BDG2 loaders (WIP)
 evaluation/          metrics: ΔP, η_v2b, φ_i, ρ (WIP)
 docs/Architecture.png  system diagram
-_staging/            earlier ICE-framed prototype, kept for reference only
 ```
 
 ## Quick start
