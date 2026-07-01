@@ -22,13 +22,11 @@ class Simulator:
             },
         }
 
-    def step(self, decisions):
-        self.fleet.step(decisions.get('fleet', []), self.network, self.dt)
-        p_v2b = self._compute_p_v2b()
-        p_hvac_map = {
-            b_id: dec.get('p_hvac', 0.0)
-            for b_id, dec in decisions.get('buildings', {}).items()
-        }
+    def step_fleet(self, fleet_decisions):
+        self.fleet.step(fleet_decisions, self.network, self.dt)
+        return self._compute_p_v2b()
+
+    def step_buildings(self, p_hvac_map, p_v2b):
         self.buildings.step(self.t, p_v2b, p_hvac_map)
         self.t += 1
 

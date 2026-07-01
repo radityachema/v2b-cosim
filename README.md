@@ -17,11 +17,19 @@ The framework separates the physical world from the decision-maker. A **Simulato
 | `FleetClass` | Collection of `Vehicle` objects (×\|𝒱\|). Each holds SoC, current arc, power rate. |
 | `BuildingClass` | Collection of `Building` objects (×\|ℬ\|). Each holds load profile, indoor temperature, charger capacity, RC thermal parameters. |
 
-**Scheduler** — the decision-maker. Pluggable: heuristic, LP, MPC, RL — anything that implements `decide()`.
-- **Input** (from `Simulator.get_state()`): geo info, fleet state, building load, building thermal state
+**Scheduler** — the decision-maker. Pluggable: heuristic, LP, MPC, RL — anything that implements `decide_fleet()` and `decide_buildings()`.
+- **Input**: geo info, fleet state, building load, building thermal state, and (for buildings) the realized P_v2b for this timestep
 - **Output**: route assignment, power dispatch rate, HVAC power
 
-**Interface**: `Simulator.get_state() → dict`, `Scheduler.decide(state) → dict`. The Simulator pulls decisions from the Scheduler every step; it never pushes anything to the Scheduler on its own. `P_v2b` — the power the fleet makes available to buildings — is computed *inside* the Simulator each step, as a byproduct of the fleet's own dispatch decisions, not something the Scheduler sets directly.
+**Interface**: each timestep is two round-trips between Simulator and Scheduler, not one — because P_v2b depends on the fleet's decision, and buildings need to see P_v2b before deciding HVAC:
+
+1. `Simulator.get_state() → dict` — snapshot of the world
+2. `Scheduler.decide_fleet(state) → list` — route/power decision per vehicle
+3. `Simulator.step_fleet(decisions) → p_v2b` — applies fleet movement, computes the realized P_v2b as a byproduct of the fleet's own dispatch (not something the Scheduler sets directly)
+4. `Scheduler.decide_buildings(state, p_v2b) → dict` — HVAC decision per building, now with real P_v2b to react to
+5. `Simulator.step_buildings(p_hvac_map, p_v2b)` — applies building physics, advances the clock
+
+The direction of information is still one-way, fleet → building. Building's decision in step 4 cannot change what the fleet already did in step 3 — by the time buildings decide, the fleet's move for this timestep is already applied to the world. It's sequential causality within one timestep, not a feedback loop.
 
 **Evaluation**: peak reduction (kW), demand fulfillment (%), V2B utilization (%), temporal alignment φ_i (correlation between fleet availability and building load).
 
@@ -52,17 +60,17 @@ Runs a synthetic 3-vehicle, 2-building scenario for 96 timesteps (15-min resolut
 
 ## Plug in your own scheduler
 
-Subclass `BaseScheduler`, implement `decide()`. Nothing else in the codebase needs to change.
+Subclass `BaseScheduler`, implement `decide_fleet()` and `decide_buildings()`. Nothing else in the codebase needs to change.
 
 ```python
 from scheduler.base import BaseScheduler
 
 class MyScheduler(BaseScheduler):
-    def decide(self, state: dict) -> dict:
-        return {
-            'fleet':     [{'arc': None, 'p': 0.0} for _ in state['fleet']],
-            'buildings': {b['b_id']: {'p_hvac': 0.0} for b in state['buildings']},
-        }
+    def decide_fleet(self, state: dict) -> list:
+        return [{'arc': None, 'p': 0.0} for _ in state['fleet']]
+
+    def decide_buildings(self, state: dict, p_v2b: dict) -> dict:
+        return {b['b_id']: 0.0 for b in state['buildings']}
 ```
 
 ## Status

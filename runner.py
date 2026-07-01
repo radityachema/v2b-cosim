@@ -35,8 +35,10 @@ if __name__ == '__main__':
 
     for _ in range(96):
         state = sim.get_state()
-        decisions = scheduler.decide(state)
-        sim.step(decisions)
+        fleet_decisions = scheduler.decide_fleet(state)
+        p_v2b = sim.step_fleet(fleet_decisions)
+        building_decisions = scheduler.decide_buildings(state, p_v2b)
+        sim.step_buildings(building_decisions, p_v2b)
 
     print(f"Scaffold OK — ran {sim.t} timesteps")
     print(f"Vehicle 0 final SoC: {sim.fleet.vehicles[0].soc:.3f}")
