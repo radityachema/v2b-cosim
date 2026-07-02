@@ -13,7 +13,7 @@ class BaseScheduler(ABC):
     def decide_buildings(self, state: dict, p_v2b: dict) -> dict:
         """
         Input:  state from Simulator.get_state(), p_v2b from Simulator.step_fleet()
-        Output: {b_id: p_hvac_float}
+        Output: {b_id: t_sp_float}  temperature setpoint, ignored by Mode A buildings
         """
 
 
@@ -22,4 +22,4 @@ class NullScheduler(BaseScheduler):
         return [{'arc': None, 'p': 0.0} for _ in state['fleet']]
 
     def decide_buildings(self, state, p_v2b):
-        return {b['b_id']: 0.0 for b in state['buildings']}
+        return {b['b_id']: 24.0 for b in state['buildings']}

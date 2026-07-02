@@ -26,7 +26,7 @@ if __name__ == '__main__':
     ])
 
     buildings = BuildingClass([
-        Building(b_id='A', load_profile={t: 40.0 for t in range(96)}, n_chargers=5),
+        Building(b_id='A', load_profile={t: 45.0 for t in range(96)}, n_chargers=5),
         Building(b_id='B', load_profile={t: 30.0 for t in range(96)}, n_chargers=3),
     ])
 
@@ -37,8 +37,8 @@ if __name__ == '__main__':
         state = sim.get_state()
         fleet_decisions = scheduler.decide_fleet(state)
         p_v2b = sim.step_fleet(fleet_decisions)
-        building_decisions = scheduler.decide_buildings(state, p_v2b)
-        sim.step_buildings(building_decisions, p_v2b)
+        t_sp_map = scheduler.decide_buildings(state, p_v2b)
+        sim.step_buildings(t_sp_map, p_v2b)
 
     print(f"Scaffold OK — ran {sim.t} timesteps")
     print(f"Vehicle 0 final SoC: {sim.fleet.vehicles[0].soc:.3f}")

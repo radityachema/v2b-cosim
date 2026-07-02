@@ -26,8 +26,8 @@ class Simulator:
         self.fleet.step(fleet_decisions, self.network, self.dt)
         return self._compute_p_v2b()
 
-    def step_buildings(self, p_hvac_map, p_v2b):
-        self.buildings.step(self.t, p_v2b, p_hvac_map)
+    def step_buildings(self, t_sp_map, p_v2b):
+        self.buildings.step(self.t, p_v2b, t_sp_map)
         self.t += 1
 
     def _compute_p_v2b(self):

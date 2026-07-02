@@ -10,6 +10,7 @@ class Building:
         self.t_in = rc['t_init'] if rc else None
         self.p_grid = 0.0
         self.p_cons = 0.0
+        self.p_hvac = 0.0
 
     @property
     def state(self):
@@ -21,9 +22,16 @@ class Building:
             'p_cons': self.p_cons,
         }
 
-    def step(self, t, p_v2b, p_hvac=0.0):
+    def step(self, t, p_v2b, t_sp=None):
+        # Bang-bang relay: fixed hardware response to a setpoint, same for every
+        # scheduler — not a decision, so it lives here rather than in the Scheduler.
+        self.p_hvac = 0.0
+        if self.rc is not None and t_sp is not None:
+            t_sp = max(self.rc.get('t_sp_min', 16.0), min(self.rc.get('t_sp_max', 30.0), t_sp))
+            self.p_hvac = self.rc.get('hvac_max', 10.0) if self.t_in > t_sp else 0.0
+
         p_load = self.load_profile.get(t, 0.0)
-        total_load = p_load + p_hvac
+        total_load = p_load + self.p_hvac
         self.p_cons = min(p_v2b, total_load)
         self.p_grid = total_load - self.p_cons
 
@@ -31,7 +39,7 @@ class Building:
             a = self.rc['a']
             b = self.rc['b']
             t_out = (self.weather or {}).get(t, 30.0)
-            self.t_in = (1 - a) * self.t_in + a * t_out - b * p_hvac
+            self.t_in = (1 - a) * self.t_in + a * t_out - b * self.p_hvac
 
 
 class BuildingClass:
@@ -42,6 +50,6 @@ class BuildingClass:
     def state(self):
         return [b.state for b in self.buildings]
 
-    def step(self, t, p_v2b_map, p_hvac_map):
+    def step(self, t, p_v2b_map, t_sp_map):
         for b in self.buildings:
-            b.step(t, p_v2b_map.get(b.b_id, 0.0), p_hvac_map.get(b.b_id, 0.0))
+            b.step(t, p_v2b_map.get(b.b_id, 0.0), t_sp_map.get(b.b_id))
