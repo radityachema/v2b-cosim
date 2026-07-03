@@ -6,6 +6,7 @@ class Simulator:
         self.buildings = buildings
         self.dt = dt
         self.t = 0
+        self.p_v2b = {b.b_id: 0.0 for b in self.buildings.buildings}
         for v in self.fleet.vehicles:
             v.node = network.depot
 
@@ -15,6 +16,7 @@ class Simulator:
             'demands': self.ride_demand.get_at(self.t),
             'fleet': self.fleet.state,
             'buildings': self.buildings.state,
+            'p_v2b': dict(self.p_v2b),
             'network': {
                 'building_nodes': self.network.building_nodes,
                 'arcs': self.network.arcs,
@@ -22,12 +24,10 @@ class Simulator:
             },
         }
 
-    def step_fleet(self, fleet_decisions):
-        self.fleet.step(fleet_decisions, self.network, self.dt)
-        return self._compute_p_v2b()
-
-    def step_buildings(self, t_sp_map, p_v2b):
-        self.buildings.step(self.t, p_v2b, t_sp_map)
+    def step(self, decisions):
+        self.buildings.step(self.t, self.p_v2b, decisions.get('buildings', {}))
+        self.fleet.step(decisions.get('fleet', []), self.network, self.dt)
+        self.p_v2b = self._compute_p_v2b()
         self.t += 1
 
     def _compute_p_v2b(self):
