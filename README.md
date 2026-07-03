@@ -33,6 +33,15 @@ Fleet and building decisions are made simultaneously off the same snapshot — n
 
 **`p_v2b` is exposed as a plain ingredient in the state, not a prescribed coupling mechanism.** The Simulator's job is to make available information visible — what a scheduler does with it (react to it, shift a threshold with it, ignore it entirely) is a decision made by whoever writes that scheduler, not something the framework dictates.
 
+**What's in `state`, exactly:**
+- `t`, `demands` (only pickups due this exact timestep — no future visibility)
+- `fleet`: per vehicle — `v_id, soc, node, arc, p` plus static hardware bounds `p_max, s_min, s_max, e_cap`
+- `buildings`: per building — `b_id, t_in, n_chargers, p_grid, p_cons` plus static thermal/hardware config `rc` (`a, b, hvac_max, t_init, t_sp_min, t_sp_max`, or `None` for Mode A)
+- `p_v2b`: the one piece of real history — lagged one timestep, as above
+- `network`: static
+
+Deliberately *not* included: any deeper history, or any future beyond the current timestep. A scheduler that wants more memory keeps it itself (a list it appends to every `decide()` call) — the Simulator doesn't guess how much history any given scheduler wants. And future building load / ride demand are withheld from the per-step interface on purpose: exposing them would erase the distinction between an online scheduler (reacts to what's already happened) and a day-ahead scheduler (sees the whole known horizon up front) — a distinction that matters for comparing methods under uncertainty. A scheduler that legitimately needs full-horizon foresight gets it via its own constructor, not through `get_state()`.
+
 **Setpoint → power is fixed physics, not a decision.** `Building.step()` converts a setpoint into actual HVAC power itself, via a bang-bang relay (`if T_in > T_sp: run at hvac_max, else off`) — the same conversion regardless of which scheduler is plugged in, exactly like `Vehicle.step()` clamps any power value to `±p_max` regardless of who requested it. No scheduler can bypass this relay to set raw kW directly; every scheduler speaks in setpoints, and the Simulator owns the physical response to them.
 
 **Evaluation**: peak reduction (kW), demand fulfillment (%), V2B utilization (%), temporal alignment φ_i (correlation between fleet availability and building load).

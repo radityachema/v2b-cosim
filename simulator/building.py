@@ -20,6 +20,7 @@ class Building:
             'n_chargers': self.n_chargers,
             'p_grid': self.p_grid,
             'p_cons': self.p_cons,
+            'rc': self.rc,
         }
 
     def step(self, t, p_v2b, t_sp=None):

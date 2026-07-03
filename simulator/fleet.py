@@ -19,6 +19,10 @@ class Vehicle:
             'node': self.node,
             'arc': self.arc,
             'p': self.p,
+            'p_max': self.p_max,
+            's_min': self.s_min,
+            's_max': self.s_max,
+            'e_cap': self.e_cap,
         }
 
     def step(self, decision, network, dt):
