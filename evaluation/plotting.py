@@ -31,6 +31,15 @@ plt.rcParams.update({
 _BUILDING_COLORS = ["#1a6faf", "#e67e22", "#27ae60", "#c0392b"]
 _SOC_COLORS = plt.cm.tab10.colors
 
+# Scheduler identity -> color, matching plot_results.py's convention
+# (baseline/actual = gray, alternatives = orange/green/blue).
+_SCHEDULER_COLORS = {
+    "null": "#999999",
+    "heuristic": "#e67e22",
+    "milp": "#1a6faf",
+}
+_SCHEDULER_STYLES = {"null": ":", "heuristic": "--", "milp": "-."}
+
 
 def plot_run(p_load_hist, p_grid_hist, soc_hist, title, save_path, dt=1.0):
     """
@@ -72,6 +81,48 @@ def plot_run(p_load_hist, p_grid_hist, soc_hist, title, save_path, dt=1.0):
     ax_soc.set_title("Vehicle SoC")
     if len(soc_hist) <= 12:
         ax_soc.legend(loc="upper left", fontsize=7, ncol=2)
+
+    fig.tight_layout()
+    fig.savefig(f"{save_path}.pdf", bbox_inches="tight")
+    fig.savefig(f"{save_path}.png", bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_comparison(p_load_hist, grid_hists_by_scheduler, title, save_path, dt=1.0):
+    """
+    The actual comparison figure: one building load curve, one grid-draw
+    line per scheduler overlaid on it -- same scenario, same building,
+    different decision-maker. One subplot per building.
+
+    p_load_hist              : dict {b_id: [kW per timestep]}
+    grid_hists_by_scheduler  : dict {scheduler_name: {b_id: [kW per timestep]}}
+    save_path                : path without extension -- saves .pdf and .png
+    """
+    building_ids = list(p_load_hist)
+    T = len(next(iter(p_load_hist.values())))
+    hours = [t * dt for t in range(T)]
+    tick_x = list(range(0, 25, 4))
+    tick_labels = [f"{h:02d}:00" for h in tick_x]
+
+    fig, axes = plt.subplots(len(building_ids), 1, figsize=(6.5, 3.2 * len(building_ids)))
+    if len(building_ids) == 1:
+        axes = [axes]
+    fig.suptitle(title)
+
+    for ax, b_id in zip(axes, building_ids):
+        ax.plot(hours, p_load_hist[b_id], color="#222222", lw=1.8, label="Building load")
+        for name, grid_hists in grid_hists_by_scheduler.items():
+            color = _SCHEDULER_COLORS.get(name, "#555555")
+            style = _SCHEDULER_STYLES.get(name, "--")
+            ax.plot(hours, grid_hists[b_id], color=color, lw=1.6, ls=style,
+                     label=f"{name} grid draw")
+        ax.set_xlabel("Time of day (h)")
+        ax.set_ylabel("kW")
+        ax.set_xticks(tick_x)
+        ax.set_xticklabels(tick_labels)
+        ax.set_xlim(0, max(hours))
+        ax.set_title(f"Building {b_id}")
+        ax.legend(loc="upper left", fontsize=8)
 
     fig.tight_layout()
     fig.savefig(f"{save_path}.pdf", bbox_inches="tight")

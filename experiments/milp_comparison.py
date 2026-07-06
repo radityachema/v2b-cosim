@@ -48,7 +48,7 @@ def run_scheduler(scenario, scheduler, label):
 
         t = state['t']
         for b in sim.buildings.buildings:
-            p_load_hist[b.b_id].append(scenario['load_profile'].get(t, 0.0))
+            p_load_hist[b.b_id].append(b.load_profile.get(t, 0.0))
             p_grid_hist[b.b_id].append(b.p_grid)
             p_cons_hist[b.b_id].append(b.p_cons)
         for b_id, v in sim.p_v2b.items():

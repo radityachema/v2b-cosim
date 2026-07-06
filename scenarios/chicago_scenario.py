@@ -186,7 +186,8 @@ def build_scenario():
         for i in range(V)
     ])
 
-    load_profile = {t: _synthetic_load(t) for t in range(T)}
+    shared_load = {t: _synthetic_load(t) for t in range(T)}
+    load_profile = {b: dict(shared_load) for b in BUILDING_NODES}  # per-building, same formula for both here
     n_chargers = int(Q_BLDG / P_BAR)
     rc_params = {
         b: {'a': RC_A, 'b': RC_B, 'hvac_max': HVAC_MAX, 't_init': T_INIT}
@@ -194,7 +195,7 @@ def build_scenario():
     }
     buildings = BuildingClass([
         Building(
-            b_id=b, load_profile=dict(load_profile), n_chargers=n_chargers,
+            b_id=b, load_profile=dict(load_profile[b]), n_chargers=n_chargers,
             rc=dict(rc_params[b]),
         )
         for b in BUILDING_NODES

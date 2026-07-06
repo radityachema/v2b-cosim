@@ -134,8 +134,10 @@ def build_and_solve_extended(
 
     # Peak must include HVAC draw -- required, not optional: otherwise the
     # thermal extension wouldn't count toward the peak it's supposed to shave.
+    # load_profile is per-building ({b_id: {t: kW}}) -- buildings can have
+    # genuinely different real load curves, not one shared synthetic profile.
     m.c_peak = pyo.Constraint(m.NB, m.TT,
-        rule=lambda m, i, t: m.Zpeak >= load_profile[t] + m.p_hvac[i, t]
+        rule=lambda m, i, t: m.Zpeak >= load_profile[i][t] + m.p_hvac[i, t]
                                         + sum(m.P[v, i, t] for v in m.V))
 
     m.c_soc_init = pyo.Constraint(m.V, rule=lambda m, v: m.S[v, 0] == S_init)

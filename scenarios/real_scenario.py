@@ -1,6 +1,8 @@
 """
 Real-data scenario: Chicago Taxi trips for fleet demand, BDG2 electricity +
-weather for building load/thermal.
+weather for building load/thermal. This is the ONE canonical scenario --
+every scheduler (Null, Heuristic, MILP) runs against these exact same
+objects, so comparisons are genuine, not staged.
 
 No BDG2 site is actually in Chicago (checked directly -- closest US_Central
 sites are Austin, TX and Minneapolis, MN). This pairs a real Chicago fleet
@@ -38,6 +40,43 @@ DT = 1.0
 NODE_MAP = {8: 0, 32: 1, 28: 2}
 DEPOT = 0
 BUILDING_NODES = [1, 2]
+V = 5
+
+# Fleet params (also used by the MILP model -- same source, no duplicate copy)
+E_CAP = 60.0
+P_BAR = 11.0
+S_MIN = 0.2
+S_MAX = 1.0
+S_INIT = 0.8
+N_CHARGERS = 5
+Q_BLDG = N_CHARGERS * P_BAR
+
+# MILP demand-service floor. lam=1.0 (serve every demand) is checked and
+# genuinely infeasible: 5 vehicles can't cover 133 real, often-overlapping
+# trip times. lam=0.3 is the largest value that solves (0.5 doesn't finish
+# in reasonable time) -- a real capacity limit, not an arbitrary choice.
+LAM = 0.3
+
+# Comfort band widened from [20,26] to [18,30]: checked directly that [20,26]
+# is infeasible against real BDG2 weather (up to 33 degC) with these RC
+# coefficients -- Hannah's small hvac_max can't out-cool that swing inside a
+# tight band. [18,30] roughly matches the old demo's "unoccupied" ceiling.
+T_MIN = 18.0
+T_MAX = 30.0
+
+# RC params, scaled to each building's OWN real load range (checked directly:
+# Catherine 18-67kW, Hannah 4-17kW) -- roughly 20-25% of peak, not a
+# copy-pasted placeholder from an unrelated synthetic demo. Hannah's hvac_max
+# bumped 5->10kW after checking [20,26] and 5kW together were infeasible
+# against real weather -- still checked feasible at [18,30]/10kW.
+RC_A = 0.05
+RC_B = 0.02
+T_INIT = 24.0
+RC_PARAMS = {
+    1: {'a': RC_A, 'b': RC_B, 'hvac_max': 15.0, 't_init': T_INIT},  # Catherine
+    2: {'a': RC_A, 'b': RC_B, 'hvac_max': 10.0, 't_init': T_INIT},  # Hannah
+}
+BUILDING_METER_ID = {1: 'Panther_office_Catherine', 2: 'Panther_office_Hannah'}
 
 
 def build_scenario():
@@ -55,20 +94,27 @@ def build_scenario():
     ride_demand = RideDemandClass(demands=demands)
 
     fleet = FleetClass([
-        Vehicle(v_id=i, soc_init=0.8, e_cap=60, p_max=11, s_min=0.2, s_max=1.0)
-        for i in range(5)
+        Vehicle(v_id=i, soc_init=S_INIT, e_cap=E_CAP, p_max=P_BAR, s_min=S_MIN, s_max=S_MAX)
+        for i in range(V)
     ])
 
-    load_1 = load_bdg2_load(BDG2_ELEC, 'Panther_office_Hannah', BDG2_DATE)
-    load_2 = load_bdg2_load(BDG2_ELEC, 'Panther_office_Catherine', BDG2_DATE)
     weather = load_bdg2_weather(BDG2_WEATHER, 'Panther', BDG2_DATE)
+    load_profile = {
+        b: load_bdg2_load(BDG2_ELEC, BUILDING_METER_ID[b], BDG2_DATE)
+        for b in BUILDING_NODES
+    }
 
     buildings = BuildingClass([
-        Building(b_id=1, load_profile=load_1, n_chargers=5,
-                 rc={'a': 0.05, 'b': 0.02, 'hvac_max': 80.0, 't_init': 24.0},
-                 weather=weather),
-        Building(b_id=2, load_profile=load_2, n_chargers=5),
+        Building(b_id=b, load_profile=dict(load_profile[b]), n_chargers=N_CHARGERS,
+                 rc=dict(RC_PARAMS[b]), weather=weather)
+        for b in BUILDING_NODES
     ])
+
+    # MILP-compatible fields -- same scenario, so MILPScheduler can plug in too.
+    demands_milp = {
+        d['id']: (d['i_d'], d['j_d'], d['t_d'], network.get_arc(d['i_d'], d['j_d'])['d'])
+        for d in demands
+    }
 
     return {
         'network': network,
@@ -77,4 +123,21 @@ def build_scenario():
         'buildings': buildings,
         'dt': DT,
         'T': T,
+        # MILP-specific fields -- ignored by Null/HeuristicScheduler, read by MILPScheduler
+        'nodes': list(NODE_MAP.values()),
+        'building_nodes': list(BUILDING_NODES),
+        'depot': DEPOT,
+        'vehicles_list': list(range(V)),
+        'demands_milp': demands_milp,
+        'load_profile': load_profile,
+        'rc_params': RC_PARAMS,
+        't_min': T_MIN,
+        't_max': T_MAX,
+        'lam': LAM,
+        'E_cap': E_CAP,
+        'P_bar': P_BAR,
+        'S_min': S_MIN,
+        'S_max': S_MAX,
+        'S_init': S_INIT,
+        'Q_bldg': Q_BLDG,
     }
