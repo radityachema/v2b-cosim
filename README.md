@@ -58,11 +58,13 @@ simulator/
 scheduler/
   base.py          BaseScheduler (abstract contract) + NullScheduler
   heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
-  _milp_model.py   Pyomo MILP model (routing + V2B + thermal) -- solves; scheduler wrapper not built yet
+  milp.py          MILPScheduler — pre-solved day-ahead comparison
+  _milp_model.py   Pyomo MILP model (routing + V2B + thermal)
 runner.py           minimal end-to-end loop (synthetic data)
 examples/
-  run_heuristic.py   HeuristicScheduler verification run (synthetic data)
-  run_real_data.py   HeuristicScheduler on real Chicago Taxi + BDG2 data
+  run_heuristic.py       HeuristicScheduler verification run (synthetic data)
+  run_real_data.py       HeuristicScheduler on real Chicago Taxi + BDG2 data
+  run_milp_comparison.py Heuristic vs MILP on identical scenario data (Task 3)
 data/loaders/
   fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
   building.py      load_bdg2_load(), load_bdg2_weather() -- real building load + outdoor temp
@@ -98,4 +100,4 @@ class MyScheduler(BaseScheduler):
 
 `HeuristicScheduler` complete and verified (`examples/run_heuristic.py`) — SoC-floor fleet dispatch, bang-bang building setpoint with a P_v2b-aware shift. Data loaders (`data/loaders/`) and evaluation metrics (`evaluation/metrics.py`) are complete and verified end-to-end against real Chicago Taxi + BDG2 data (`examples/run_real_data.py`).
 
-A MILP comparison scheduler is partially done — the extended Pyomo model (`scheduler/_milp_model.py`) solves correctly against a real 6-zone/30-vehicle/317-demand Chicago scenario (`scenarios/chicago_scenario.py`), but the `MILPScheduler` wrapper and the Task 3 comparability run haven't been built yet. Not the paper's main method — a baseline comparison, picked up after the core deliverables above if time allows.
+`MILPScheduler` complete and compared against `HeuristicScheduler` on identical scenario data (`examples/run_milp_comparison.py`) — the extended Pyomo model (`scheduler/_milp_model.py`) solves against a real 6-zone/30-vehicle/317-demand Chicago scenario (`scenarios/chicago_scenario.py`). Not the paper's main method — a baseline comparison. Two structural asymmetries are worth remembering when reading results: the MILP has full-day foresight and a hard 100%-demand-service constraint the heuristic doesn't have, so report peak reduction *and* demand fulfillment together, never peak reduction alone.
