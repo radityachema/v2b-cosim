@@ -57,7 +57,9 @@ simulator/
   simulator.py     Simulator — steps all classes, computes P_v2b
 scheduler/
   base.py          BaseScheduler (abstract contract) + NullScheduler
+  heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
 runner.py           minimal end-to-end loop (synthetic data)
+examples/run_heuristic.py  HeuristicScheduler verification run
 data/loaders/        Chicago taxi + BDG2 loaders (WIP)
 evaluation/          metrics: ΔP, η_v2b, φ_i, ρ (WIP)
 docs/Architecture.png  system diagram
@@ -88,4 +90,4 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-Simulator scaffold complete — no heuristic scheduler yet. Next: `HeuristicScheduler` (SoC-floor dispatch rule), then data loaders for Chicago Taxi + BDG2, then evaluation metrics.
+`HeuristicScheduler` complete and verified (`examples/run_heuristic.py`) — SoC-floor fleet dispatch, bang-bang building setpoint with a P_v2b-aware shift. A MILP comparison scheduler is next (`scheduler/milp.py`, work in progress) — not the paper's main method, just a baseline comparison. Then data loaders for Chicago Taxi + BDG2, then evaluation metrics.
