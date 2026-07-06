@@ -111,5 +111,3 @@ class MyScheduler(BaseScheduler):
 `runner.py` is the plug-and-play demo: `NullScheduler`, `HeuristicScheduler`, and `MILPScheduler` all run against the same real-data scenario (`scenarios/real_scenario.py`), verified end-to-end, including a real solved MILP result (peak reduction, V2B utilization, temporal alignment all computed identically for all three). `experiments/milp_comparison.py` runs the same comparison at a much larger scale (30 vehicles, 317 real demands) — same idea, bigger and slower to solve.
 
 Two structural asymmetries are worth remembering when reading either comparison: the MILP has full-day foresight and a demand-service floor the heuristic doesn't have (checked directly: `λ=1.0`, i.e. serve every demand, is infeasible for the 5-vehicle real scenario — `λ=0.3` is the largest value that solves), so report peak reduction *and* demand fulfillment together, never peak reduction alone.
-
-`MILPScheduler` isn't the paper's main method — a comparison baseline.
