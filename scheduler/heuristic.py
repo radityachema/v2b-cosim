@@ -12,7 +12,8 @@ class HeuristicScheduler(BaseScheduler):
     # current timestep -- there's no forward-demand-assignment mechanism in this
     # codebase to compute a real per-vehicle "next trip" reserve against. A fixed
     # constant is the honest simplification given what's actually available.
-    S_RESERVE = 0.2
+
+    S_RESERVE = 0.2 #TODO: search for literature
 
     T_SP_BASE = 24.0
     T_SP_DELTA = 2.0

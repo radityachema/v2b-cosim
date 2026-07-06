@@ -58,10 +58,16 @@ simulator/
 scheduler/
   base.py          BaseScheduler (abstract contract) + NullScheduler
   heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
+  _milp_model.py   Pyomo MILP model (routing + V2B + thermal) -- solves; scheduler wrapper not built yet
 runner.py           minimal end-to-end loop (synthetic data)
-examples/run_heuristic.py  HeuristicScheduler verification run
-data/loaders/        Chicago taxi + BDG2 loaders (WIP)
-evaluation/          metrics: ΔP, η_v2b, φ_i, ρ (WIP)
+examples/
+  run_heuristic.py   HeuristicScheduler verification run (synthetic data)
+  run_real_data.py   HeuristicScheduler on real Chicago Taxi + BDG2 data
+data/loaders/
+  fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
+  building.py      load_bdg2_load(), load_bdg2_weather() -- real building load + outdoor temp
+evaluation/metrics.py  ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
+scenarios/chicago_scenario.py  one-off N=6/V=30/D=317 scenario replica for the MILP comparison
 docs/Architecture.png  system diagram
 ```
 
@@ -90,4 +96,6 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-`HeuristicScheduler` complete and verified (`examples/run_heuristic.py`) — SoC-floor fleet dispatch, bang-bang building setpoint with a P_v2b-aware shift. A MILP comparison scheduler is next (`scheduler/milp.py`, work in progress) — not the paper's main method, just a baseline comparison. Then data loaders for Chicago Taxi + BDG2, then evaluation metrics.
+`HeuristicScheduler` complete and verified (`examples/run_heuristic.py`) — SoC-floor fleet dispatch, bang-bang building setpoint with a P_v2b-aware shift. Data loaders (`data/loaders/`) and evaluation metrics (`evaluation/metrics.py`) are complete and verified end-to-end against real Chicago Taxi + BDG2 data (`examples/run_real_data.py`).
+
+A MILP comparison scheduler is partially done — the extended Pyomo model (`scheduler/_milp_model.py`) solves correctly against a real 6-zone/30-vehicle/317-demand Chicago scenario (`scenarios/chicago_scenario.py`), but the `MILPScheduler` wrapper and the Task 3 comparability run haven't been built yet. Not the paper's main method — a baseline comparison, picked up after the core deliverables above if time allows.
