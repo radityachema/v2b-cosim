@@ -2,8 +2,9 @@
 Evaluation metrics -- physical units only, no monetary conversions.
 
 Operate on plain Python sequences/dicts collected while running a
-Simulator + Scheduler loop (see examples/ for how to collect history).
-No pandas/numpy dependency, matching the rest of the core framework.
+Simulator + Scheduler loop (see runner.py's run() function for how to
+collect this history from a live simulation). No pandas/numpy
+dependency, matching the rest of the core framework.
 """
 import statistics
 

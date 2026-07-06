@@ -1,10 +1,11 @@
 """
-Heuristic-vs-MILP comparison at the Chicago scenario's scale (6 zones,
-30 vehicles, 317 real demands). Self-contained -- MILPScheduler needs a
-differently-shaped scenario (demands_milp, lambda service target, RC
-params, etc.) than runner.py's plug-and-play demo provides, so this
-lives on its own rather than pretending to be a generic "pick any
-scheduler" entry point.
+Heuristic-vs-MILP comparison at a much larger scale than runner.py's demo:
+6 real Chicago zones, 30 vehicles, 317 real ride demands. `runner.py`
+already runs `MILPScheduler` against its own small scenario in seconds --
+this script exists only because solving the MILP at THIS scale takes
+minutes, so it doesn't belong in the quick interactive demo. The scenario
+shape both use is otherwise the same (see scenarios/chicago_scenario.py
+vs scenarios/real_scenario.py).
 
 Two known, expected asymmetries -- not bugs, stated here rather than left
 implicit:

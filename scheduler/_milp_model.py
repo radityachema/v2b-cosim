@@ -1,16 +1,23 @@
 """
 Pure Pyomo model builder for the day-ahead joint routing + V2B dispatch +
 thermal MILP. No knowledge of this repo's Simulator/Scheduler classes --
-plain dicts/lists in, plain result dict out. Reference math: the same
-x, y, P, S, Z_peak notation as v3_simplified_peak_shaving.md, extended
-with RC thermal variables.
+plain dicts/lists in, plain result dict out.
 
-Reformulated from the source notebook's `build_and_solve` in one respect:
-adds a `dep[v,i,j,t]` variable that is 1 only at the exact timestep a
-vehicle departs on arc (i,j) (derived from `x` via a standard AND-linking
-constraint, not detected after solving). This is what MILPScheduler reads
-to build a per-timestep decision -- a direct lookup, not a pattern-match
-over the solved `x` trajectory.
+Variables: x[v,i,j,t] (binary, 1 if vehicle v occupies arc (i,j) during
+timestep t -- including every timestep of a multi-step trip, not just
+departure), y[v,d] (binary, 1 if vehicle v serves demand d), P[v,i,t]
+(continuous signed power, vehicle v at building i, + = charging), S[v,t]
+(continuous SoC), Z_peak (the objective: minimize the worst building
+peak across all buildings and timesteps).
+
+dep[v,i,j,t] is an added binary variable, 1 only at the exact timestep
+a vehicle departs on arc (i,j), derived from `x` via a standard
+AND-linking constraint (not detected by pattern-matching after solving).
+This is what MILPScheduler reads to build a per-timestep decision -- a
+direct lookup, not a search over the solved `x` trajectory. `x` itself
+represents "occupying the arc" (needed for the SoC/transit-duration
+constraints), which doesn't directly tell you "did the vehicle just
+depart this timestep" -- `dep` answers that question directly.
 
 Network numbers (e, tau) are pulled from the actual NetworkClass instance
 passed in, never recomputed independently -- single source of truth with

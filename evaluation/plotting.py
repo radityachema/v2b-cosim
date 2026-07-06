@@ -1,11 +1,10 @@
 """
-Visualization for a single Simulator run's collected history. Style
-matches the paper's existing figures (Co-simulation thermal V2B /
-plot_results.py, which produced fig1_alignment / fig2_peak_reduction /
-fig3_temperature in the ASIM 2026 LaTeX template) -- serif font, muted
-palette, time-of-day x-axis, print-resolution PDF + PNG. Always saves to
-file (not plt.show()) -- robust regardless of whether a display is
-available, and gives you a file to compare across runs.
+Visualization for a Simulator run's collected history. Publication-style
+formatting -- serif font, muted color palette, time-of-day x-axis,
+print-resolution PDF + PNG output -- so figures are ready to drop into a
+paper without reformatting. Always saves to file (not plt.show()) --
+robust regardless of whether a display is available, and gives you a
+file to compare across runs.
 """
 import matplotlib.pyplot as plt
 

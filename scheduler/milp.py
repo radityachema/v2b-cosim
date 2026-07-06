@@ -3,7 +3,9 @@ MILPScheduler -- day-ahead, pre-solved comparison scheduler. Solves the
 entire horizon once at construction (Pyomo + Gurobi), then decide() is a
 stateless O(1) lookup into the pre-solved plan. Not the paper's main
 method -- a comparison baseline against HeuristicScheduler on identical
-scenario data (see scenarios/chicago_scenario.py).
+scenario data. Works with any scenario dict that carries the fields
+`build_and_solve_extended()` needs (see scheduler/_milp_model.py) --
+scenarios/real_scenario.py and scenarios/chicago_scenario.py both do.
 """
 import pyomo.environ as pyo
 

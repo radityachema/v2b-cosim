@@ -11,6 +11,8 @@ That's fine for demonstrating the loaders + scheduler + metrics pipeline
 works end-to-end on real (not synthetic) data -- it is not a claim about a
 geographically coherent deployment.
 """
+from pathlib import Path
+
 from simulator.network import NetworkClass
 from simulator.ride_demand import RideDemandClass
 from simulator.fleet import FleetClass, Vehicle
@@ -18,18 +20,11 @@ from simulator.building import BuildingClass, Building
 from data.loaders.fleet import load_chicago_taxi_demands
 from data.loaders.building import load_bdg2_load, load_bdg2_weather
 
-TAXI_CSV = (
-    r"C:\Users\Lenovo\Documents\PhD Folder\99_Extras\Code\Toytrial"
-    r"\data\Taxi_Trips_(2013-2023)_20260121.csv"
-)
-BDG2_ELEC = (
-    r"C:\Users\Lenovo\Documents\PhD Folder\99_Extras\Code\Toytrial"
-    r"\building-data-genome-project-2\data\meters\cleaned\electricity_cleaned.csv"
-)
-BDG2_WEATHER = (
-    r"C:\Users\Lenovo\Documents\PhD Folder\99_Extras\Code\Toytrial"
-    r"\building-data-genome-project-2\data\weather\weather.csv"
-)
+# See data/README.md for where to get these files.
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+TAXI_CSV = DATA_DIR / "chicago_taxi_trips.csv"
+BDG2_ELEC = DATA_DIR / "bdg2" / "electricity_cleaned.csv"
+BDG2_WEATHER = DATA_DIR / "bdg2" / "weather.csv"
 
 TAXI_DATE = "2019-01-02"
 BDG2_DATE = "2016-06-15"
@@ -53,22 +48,26 @@ Q_BLDG = N_CHARGERS * P_BAR
 
 # MILP demand-service floor. lam=1.0 (serve every demand) is checked and
 # genuinely infeasible: 5 vehicles can't cover 133 real, often-overlapping
-# trip times. lam=0.3 is the largest value that solves (0.5 doesn't finish
-# in reasonable time) -- a real capacity limit, not an arbitrary choice.
+# trip times in one day. lam=0.3 is the largest value that solves in
+# reasonable time (0.5 doesn't finish) -- a real fleet-size limit, not an
+# arbitrary choice.
 LAM = 0.3
 
-# Comfort band widened from [20,26] to [18,30]: checked directly that [20,26]
-# is infeasible against real BDG2 weather (up to 33 degC) with these RC
-# coefficients -- Hannah's small hvac_max can't out-cool that swing inside a
-# tight band. [18,30] roughly matches the old demo's "unoccupied" ceiling.
+# Comfort band [18,30] deg C. A tighter [20,26] band was checked and found
+# infeasible against real BDG2 weather (up to 33 degC that day) combined
+# with the RC parameters below -- the weaker building's HVAC unit can't
+# out-cool that swing inside a tight band. [18,30] is a wider, still
+# plausible band for an unoccupied/lightly-occupied office.
 T_MIN = 18.0
 T_MAX = 30.0
 
-# RC params, scaled to each building's OWN real load range (checked directly:
-# Catherine 18-67kW, Hannah 4-17kW) -- roughly 20-25% of peak, not a
-# copy-pasted placeholder from an unrelated synthetic demo. Hannah's hvac_max
-# bumped 5->10kW after checking [20,26] and 5kW together were infeasible
-# against real weather -- still checked feasible at [18,30]/10kW.
+# RC thermal parameters, one set per building, sized to each building's own
+# real load range (checked directly against the meter data: Catherine
+# 18-67kW, Hannah 4-17kW) -- hvac_max is roughly 20-25% of each building's
+# own peak load, not a single reused placeholder value. Hannah's hvac_max
+# is 10kW rather than a more "proportionate" 3-5kW because a smaller value
+# was checked and found infeasible against real summer weather at the
+# comfort band above.
 RC_A = 0.05
 RC_B = 0.02
 T_INIT = 24.0
@@ -90,7 +89,7 @@ def build_scenario():
         depot=DEPOT,
     )
 
-    demands = load_chicago_taxi_demands(TAXI_CSV, TAXI_DATE, NODE_MAP)
+    demands = load_chicago_taxi_demands(str(TAXI_CSV), TAXI_DATE, NODE_MAP)
     ride_demand = RideDemandClass(demands=demands)
 
     fleet = FleetClass([
@@ -98,9 +97,9 @@ def build_scenario():
         for i in range(V)
     ])
 
-    weather = load_bdg2_weather(BDG2_WEATHER, 'Panther', BDG2_DATE)
+    weather = load_bdg2_weather(str(BDG2_WEATHER), 'Panther', BDG2_DATE)
     load_profile = {
-        b: load_bdg2_load(BDG2_ELEC, BUILDING_METER_ID[b], BDG2_DATE)
+        b: load_bdg2_load(str(BDG2_ELEC), BUILDING_METER_ID[b], BDG2_DATE)
         for b in BUILDING_NODES
     }
 
