@@ -1,57 +1,30 @@
 """
-Interactive entry point: pick a scenario, pick a scheduler (or run every
-scheduler compatible with that scenario), optionally save a plot.
+Plug-and-play demo: one Simulator, built from real Chicago Taxi + BDG2
+data. Pick a Scheduler to run it with -- that's the whole demo. Add your
+own BaseScheduler subclass to SCHEDULERS below; nothing else here needs
+to change.
 
-For a non-interactive correctness check instead of exploration, see
-tests/test_heuristic.py.
+For the MILP-vs-heuristic comparison at a larger, MILP-specific scale,
+see experiments/milp_comparison.py -- a separate, self-contained script.
+MILPScheduler needs differently-shaped scenario data (demand distances,
+service-level target, etc.) than the one scenario this demo uses, so it
+isn't offered here; forcing it into this menu is what caused the
+scenario/compatibility-matrix mess this file used to have.
+
+For a fast, dependency-free correctness check instead of exploration,
+see tests/test_heuristic.py.
 """
 from simulator import Simulator
 from scheduler.base import NullScheduler
 from scheduler.heuristic import HeuristicScheduler
-from scheduler.milp import MILPScheduler
+from scenarios.real_scenario import build_scenario
 from evaluation import metrics
 from evaluation.plotting import plot_run
 
-SCENARIOS = {
-    '1': ('toy', 'Toy synthetic (3 vehicles, 2 buildings, no external files)'),
-    '2': ('real', 'Real data (Chicago Taxi + BDG2)'),
-    '3': ('chicago', 'Chicago MILP scenario (6 zones, 30 vehicles, 317 real demands)'),
-}
-
 SCHEDULERS = {
-    'null':      'NullScheduler (do-nothing baseline)',
-    'heuristic': 'HeuristicScheduler',
-    'milp':      'MILPScheduler (pre-solved MILP, Chicago scenario only)',
+    'null': NullScheduler,
+    'heuristic': HeuristicScheduler,
 }
-
-COMPATIBLE = {
-    'toy': ['null', 'heuristic'],
-    'real': ['null', 'heuristic'],
-    'chicago': ['null', 'heuristic', 'milp'],
-}
-
-
-def build_scenario(name):
-    if name == 'toy':
-        from scenarios.toy_scenario import build_scenario as build
-    elif name == 'real':
-        from scenarios.real_scenario import build_scenario as build
-    elif name == 'chicago':
-        from scenarios.chicago_scenario import build_scenario as build
-    else:
-        raise ValueError(name)
-    return build()
-
-
-def build_scheduler(name, scenario):
-    if name == 'null':
-        return NullScheduler()
-    if name == 'heuristic':
-        return HeuristicScheduler()
-    if name == 'milp':
-        print("Solving MILP (this can take a few minutes)...")
-        return MILPScheduler(scenario)
-    raise ValueError(name)
 
 
 def run(scenario, scheduler, label, visualize):
@@ -101,42 +74,29 @@ def run(scenario, scheduler, label, visualize):
     print(f"  Fleet: demand_fulfillment (rho) = {rho:.2%} ({len(served)}/{len(all_demands)})")
 
     if visualize:
-        safe_label = label.replace('/', '_').replace(' ', '_')
-        path = f"run_{safe_label}.png"
+        path = f"run_{label}.png"
         plot_run(p_load_hist, p_grid_hist, soc_hist, label, path)
         print(f"  Saved plot to {path}")
 
 
 def _prompt(options, question):
     print(question)
-    for key, desc in options.items():
-        print(f"  {key}) {desc}")
+    for key in options:
+        print(f"  {key}")
     while True:
         choice = input("> ").strip().lower()
         if choice in options:
             return choice
-        print(f"'{choice}' isn't one of {list(options.keys())}, try again.")
-
-
-def main():
-    scenario_options = {k: v[1] for k, v in SCENARIOS.items()}
-    scenario_key = _prompt(scenario_options, "Which scenario?")
-    scenario_name = SCENARIOS[scenario_key][0]
-
-    compatible = COMPATIBLE[scenario_name]
-    scheduler_options = {k: v for k, v in SCHEDULERS.items() if k in compatible}
-    scheduler_options['all'] = f"Run all compatible schedulers ({', '.join(compatible)})"
-    scheduler_choice = _prompt(scheduler_options, f"Which scheduler? (compatible with '{scenario_name}')")
-
-    visualize = input("Save a plot of the results? (y/n) > ").strip().lower().startswith('y')
-
-    names = compatible if scheduler_choice == 'all' else [scheduler_choice]
-
-    for name in names:
-        scenario = build_scenario(scenario_name)  # fresh objects per run -- Simulator mutates fleet/buildings
-        scheduler = build_scheduler(name, scenario)
-        run(scenario, scheduler, f"{scenario_name}-{name}", visualize)
+        print(f"'{choice}' isn't one of {list(options)}, try again.")
 
 
 if __name__ == '__main__':
-    main()
+    options = list(SCHEDULERS) + ['all']
+    name = _prompt(options, "Which scheduler?")
+    visualize = input("Save a plot? (y/n) > ").strip().lower().startswith('y')
+
+    names = list(SCHEDULERS) if name == 'all' else [name]
+    for n in names:
+        scenario = build_scenario()  # fresh objects per run -- Simulator mutates fleet/buildings
+        scheduler = SCHEDULERS[n]()
+        run(scenario, scheduler, n, visualize)

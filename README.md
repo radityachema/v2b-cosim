@@ -60,7 +60,8 @@ scheduler/
   heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
   milp.py          MILPScheduler — pre-solved day-ahead comparison
   _milp_model.py   Pyomo MILP model (routing + V2B + thermal)
-runner.py           interactive entry point -- pick scenario, pick scheduler, optionally plot
+runner.py           plug-and-play demo -- one real-data scenario, pick a scheduler, optionally plot
+experiments/milp_comparison.py  Heuristic vs MILP, Chicago-scale, self-contained (not part of the demo above)
 tests/test_heuristic.py  non-interactive correctness check (asserts, no test framework)
 data/loaders/
   fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
@@ -69,9 +70,9 @@ evaluation/
   metrics.py       ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
   plotting.py      load-vs-grid-draw and SoC plots, matplotlib, always saves to file
 scenarios/
-  toy_scenario.py      3 vehicles, 2 buildings, no external files
-  real_scenario.py     Chicago Taxi + BDG2, real data
-  chicago_scenario.py  one-off N=6/V=30/D=317 scenario replica for the MILP comparison
+  toy_scenario.py      3 vehicles, 2 buildings, no external files -- used by tests/ only
+  real_scenario.py     Chicago Taxi + BDG2, real data -- used by runner.py
+  chicago_scenario.py  N=6/V=30/D=317 Chicago-scale replica -- used by experiments/milp_comparison.py only
 docs/Architecture.png  system diagram
 ```
 
@@ -81,9 +82,11 @@ docs/Architecture.png  system diagram
 python runner.py
 ```
 
-Prompts you to pick a scenario (toy synthetic / real data / the Chicago MILP scenario), then a scheduler compatible with it (`NullScheduler`, `HeuristicScheduler`, or — Chicago scenario only — `MILPScheduler`; `all` runs every compatible scheduler back to back), then whether to save a plot. Prints ΔP, η_v2b, φ_i, ρ for each run.
+Prompts for a scheduler (`NullScheduler`, `HeuristicScheduler`, or `all`), then whether to save a plot, then runs it against one fixed real-data scenario (Chicago Taxi + BDG2). Prints ΔP, η_v2b, φ_i, ρ. That's the whole demo — one Simulator, swap the Scheduler.
 
-For a fast, dependency-free sanity check that the Simulator/Scheduler plumbing itself works (no scheduler decision logic, no external files), pick the toy scenario with `NullScheduler`.
+`MILPScheduler` isn't offered here: it needs a differently-shaped scenario (a demand-distance table, a service-level target, RC params) than the one this demo uses, so pretending it's a drop-in menu option is what caused an earlier version of this file to grow a scenario-picker and a scheduler/scenario compatibility matrix — accidental complexity that worked against the "swap the Scheduler, nothing else changes" pitch this repo is actually about. See `experiments/milp_comparison.py` for the MILP comparison, run on its own terms.
+
+For a fast, dependency-free correctness check instead of exploration, run `tests/test_heuristic.py`.
 
 ## Plug in your own scheduler
 
@@ -102,6 +105,6 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-All three schedulers (`NullScheduler`, `HeuristicScheduler`, `MILPScheduler`) work end-to-end against all three scenarios they're compatible with (toy synthetic, real Chicago Taxi + BDG2, and the Chicago MILP scenario), driven through the single interactive `runner.py`. Data loaders and evaluation metrics are complete and verified against real data.
+`runner.py` is the plug-and-play demo: `NullScheduler` and `HeuristicScheduler` both run against one real-data scenario, verified end-to-end. `experiments/milp_comparison.py` runs `MILPScheduler` against `HeuristicScheduler` at Chicago scale (30 vehicles, 317 real demands) as a separate, self-contained comparison — not the paper's main method, and not pretending to be a third option in the demo above.
 
-`MILPScheduler` is a comparison baseline, not the paper's main method. Two structural asymmetries are worth remembering when reading results side by side: the MILP has full-day foresight and a hard 100%-demand-service constraint the heuristic doesn't have, so report peak reduction *and* demand fulfillment together, never peak reduction alone.
+Two structural asymmetries are worth remembering when reading the MILP comparison: the MILP has full-day foresight and a hard 100%-demand-service constraint the heuristic doesn't have, so report peak reduction *and* demand fulfillment together, never peak reduction alone.
