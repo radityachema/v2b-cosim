@@ -74,9 +74,9 @@ def run(scenario, scheduler, label, visualize):
     print(f"  Fleet: demand_fulfillment (rho) = {rho:.2%} ({len(served)}/{len(all_demands)})")
 
     if visualize:
-        path = f"run_{label}.png"
-        plot_run(p_load_hist, p_grid_hist, soc_hist, label, path)
-        print(f"  Saved plot to {path}")
+        path = f"run_{label}"
+        plot_run(p_load_hist, p_grid_hist, soc_hist, label, path, dt=scenario['dt'])
+        print(f"  Saved plot to {path}.pdf / {path}.png")
 
 
 def _prompt(options, question):
