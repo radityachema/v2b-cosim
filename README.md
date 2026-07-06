@@ -44,7 +44,7 @@ Deliberately *not* included: any deeper history, or any future beyond the curren
 
 **Setpoint → power is fixed physics, not a decision.** `Building.step()` converts a setpoint into actual HVAC power itself, via a bang-bang relay (`if T_in > T_sp: run at hvac_max, else off`) — the same conversion regardless of which scheduler is plugged in, exactly like `Vehicle.step()` clamps any power value to `±p_max` regardless of who requested it. No scheduler can bypass this relay to set raw kW directly; every scheduler speaks in setpoints, and the Simulator owns the physical response to them.
 
-**Evaluation**: peak reduction (kW), demand fulfillment (%), V2B utilization (%), temporal alignment φ_i (correlation between fleet availability and building load).
+**Evaluation** (`evaluation/metrics.py`): peak reduction ΔP (kW), demand fulfillment ρ (%), V2B utilization η_v2b (%), temporal alignment φ_i (correlation between fleet availability and building load). `evaluation/plotting.py` renders load-vs-grid-draw and vehicle SoC over time for a single run, saved to a PNG.
 
 ## Repo layout
 
@@ -60,16 +60,18 @@ scheduler/
   heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
   milp.py          MILPScheduler — pre-solved day-ahead comparison
   _milp_model.py   Pyomo MILP model (routing + V2B + thermal)
-runner.py           minimal end-to-end loop (synthetic data)
-examples/
-  run_heuristic.py       HeuristicScheduler verification run (synthetic data)
-  run_real_data.py       HeuristicScheduler on real Chicago Taxi + BDG2 data
-  run_milp_comparison.py Heuristic vs MILP on identical scenario data (Task 3)
+runner.py           interactive entry point -- pick scenario, pick scheduler, optionally plot
+tests/test_heuristic.py  non-interactive correctness check (asserts, no test framework)
 data/loaders/
   fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
   building.py      load_bdg2_load(), load_bdg2_weather() -- real building load + outdoor temp
-evaluation/metrics.py  ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
-scenarios/chicago_scenario.py  one-off N=6/V=30/D=317 scenario replica for the MILP comparison
+evaluation/
+  metrics.py       ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
+  plotting.py      load-vs-grid-draw and SoC plots, matplotlib, always saves to file
+scenarios/
+  toy_scenario.py      3 vehicles, 2 buildings, no external files
+  real_scenario.py     Chicago Taxi + BDG2, real data
+  chicago_scenario.py  one-off N=6/V=30/D=317 scenario replica for the MILP comparison
 docs/Architecture.png  system diagram
 ```
 
@@ -79,7 +81,9 @@ docs/Architecture.png  system diagram
 python runner.py
 ```
 
-Runs a synthetic 3-vehicle, 2-building scenario for 96 timesteps (15-min resolution, 1 day) with a `NullScheduler` — every vehicle stays idle, every building runs no HVAC. This just proves the Simulator/Scheduler loop wires together correctly.
+Prompts you to pick a scenario (toy synthetic / real data / the Chicago MILP scenario), then a scheduler compatible with it (`NullScheduler`, `HeuristicScheduler`, or — Chicago scenario only — `MILPScheduler`; `all` runs every compatible scheduler back to back), then whether to save a plot. Prints ΔP, η_v2b, φ_i, ρ for each run.
+
+For a fast, dependency-free sanity check that the Simulator/Scheduler plumbing itself works (no scheduler decision logic, no external files), pick the toy scenario with `NullScheduler`.
 
 ## Plug in your own scheduler
 
@@ -98,6 +102,6 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-`HeuristicScheduler` complete and verified (`examples/run_heuristic.py`) — SoC-floor fleet dispatch, bang-bang building setpoint with a P_v2b-aware shift. Data loaders (`data/loaders/`) and evaluation metrics (`evaluation/metrics.py`) are complete and verified end-to-end against real Chicago Taxi + BDG2 data (`examples/run_real_data.py`).
+All three schedulers (`NullScheduler`, `HeuristicScheduler`, `MILPScheduler`) work end-to-end against all three scenarios they're compatible with (toy synthetic, real Chicago Taxi + BDG2, and the Chicago MILP scenario), driven through the single interactive `runner.py`. Data loaders and evaluation metrics are complete and verified against real data.
 
-`MILPScheduler` complete and compared against `HeuristicScheduler` on identical scenario data (`examples/run_milp_comparison.py`) — the extended Pyomo model (`scheduler/_milp_model.py`) solves against a real 6-zone/30-vehicle/317-demand Chicago scenario (`scenarios/chicago_scenario.py`). Not the paper's main method — a baseline comparison. Two structural asymmetries are worth remembering when reading results: the MILP has full-day foresight and a hard 100%-demand-service constraint the heuristic doesn't have, so report peak reduction *and* demand fulfillment together, never peak reduction alone.
+`MILPScheduler` is a comparison baseline, not the paper's main method. Two structural asymmetries are worth remembering when reading results side by side: the MILP has full-day foresight and a hard 100%-demand-service constraint the heuristic doesn't have, so report peak reduction *and* demand fulfillment together, never peak reduction alone.
