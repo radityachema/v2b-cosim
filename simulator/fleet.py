@@ -26,15 +26,10 @@ class Vehicle:
         }
 
     def step(self, decision, network, dt):
-        # SoC is clamped to [s_min, s_max] after every consuming/charging step,
-        # including mid-transit driving -- a vehicle dispatched on a trip it
-        # doesn't have enough energy for floors at s_min rather than going
-        # negative. Known simplification: no scheduler currently checks SoC
-        # against trip cost before committing to a demand.
         if self.arc is not None:
             arc_info = network.get_arc(*self.arc)
             self.soc -= arc_info['e'] / arc_info['tau']
-            self.soc = max(self.s_min, min(self.s_max, self.soc))
+            self.soc = max(self.s_min, min(self.s_max, self.soc))  # floors at s_min -- trip cost isn't pre-checked
             self.arc_remaining -= 1
             if self.arc_remaining == 0:
                 self.node = self.arc[1]

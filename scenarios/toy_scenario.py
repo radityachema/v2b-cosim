@@ -1,9 +1,4 @@
-"""
-Minimal synthetic scenario -- 3 vehicles, 2 buildings, hand-typed data.
-No external files needed. Fast, dependency-free sanity check of the
-Simulator/Scheduler plumbing itself, independent of any scheduler's
-decision logic or real data.
-"""
+"""Minimal hand-typed scenario for sanity-checking Simulator/Scheduler plumbing."""
 from simulator.network import NetworkClass
 from simulator.ride_demand import RideDemandClass
 from simulator.fleet import FleetClass, Vehicle

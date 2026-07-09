@@ -81,11 +81,8 @@ scenarios/
                        field any scheduler needs (Null, Heuristic, or MILP), so all three run
                        against genuinely identical data -- no separate scenario per scheduler.
   chicago_scenario.py  4 real Chicago community areas, 13 vehicles, 121 real demands -- runner.py's
-                       "chicago" scenario, a bigger/slower companion to "small" (synthetic building
-                       load instead of real BDG2). MILPScheduler's lambda=1.0 demand floor (kept at
-                       a hard 100%, not relaxed) solves in ~5s at this scale -- checked directly
-                       that the original 6-area/30-vehicle version does NOT solve within 300s even
-                       at lambda=0.0, so this is a smaller real network, not a relaxed problem.
+                       "chicago" scenario (synthetic building load; see Quick Start for why this
+                       size was chosen).
 docs/Architecture.png  system diagram
 ```
 
@@ -101,7 +98,7 @@ python runner.py
 
 Prompts for a scenario (`small`: 5 vehicles, 3 nodes, seconds to solve; `chicago`: 13 vehicles, 4 real Chicago community areas, 121 real demands, harder but still solves in ~5s), then a scheduler (`null`, `heuristic`, `milp`, or `all`), then whether to save a plot, then prints ΔP, η_v2b, φ_i, ρ for each. Pick `all` to run every scheduler against the identical scenario and get one comparison plot — the same building load curve with each scheduler's grid draw overlaid on it, so it's a genuine apples-to-apples comparison, not separate experiments.
 
-`MILPScheduler` solves in seconds against either scenario — it's a real, satisfied instance of the `BaseScheduler` contract, not a special case requiring different data. Both keep `lambda=1.0` (100% demand-service floor) fixed rather than relaxed. `chicago_scenario.py` was originally 6 areas / 30 vehicles / 317 demands; checked directly that this does **not** solve within Gurobi's default time limit even at `lambda=0.0` (no demand constraint at all) -- the bottleneck is the routing formulation's combinatorial size, not the demand floor. The scenario now used is a smaller real network (4 areas / 13 vehicles / 121 real demands) found by testing V=10..20 directly: V≤14 solves in under 20s, V≥15 doesn't solve within 90s. `Null`/`HeuristicScheduler` run against either scenario the same way, no solver involved.
+`MILPScheduler` solves in seconds against either scenario — it's a real, satisfied instance of the `BaseScheduler` contract, not a special case requiring different data. `chicago` keeps `lambda=1.0` (100% demand-service floor) fixed; `small` uses `lambda=0.3`, the largest value that solves there (see Status below). `chicago_scenario.py` was originally 6 areas / 30 vehicles / 317 demands; checked directly that this does **not** solve within Gurobi's default time limit even at `lambda=0.0` (no demand constraint at all) -- the bottleneck is the routing formulation's combinatorial size, not the demand floor. The scenario now used is a smaller real network (4 areas / 13 vehicles / 121 real demands) found by testing V=10..20 directly: V≤14 solves in under 20s, V≥15 doesn't solve within 90s. `Null`/`HeuristicScheduler` run against either scenario the same way, no solver involved.
 
 For a fast, dependency-free correctness check instead of exploration (no data files or Gurobi needed):
 

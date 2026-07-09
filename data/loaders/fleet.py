@@ -8,29 +8,9 @@ import pandas as pd
 
 
 def load_chicago_taxi_demands(path, date, node_map):
-    """Load one day of Chicago taxi trips as ride demands for RideDemandClass.
-
-    Parameters
-    ----------
-    path : str
-        Path to the downloaded CSV.
-    date : str
-        Date to filter to, e.g. "2019-01-02".
-    node_map : dict
-        Maps Chicago Community Area id -> network node id. Trips whose
-        pickup or dropoff area isn't a key are dropped -- this loader
-        doesn't decide which areas belong in a given network, the caller
-        does, so it stays reusable across different network setups.
-
-    Returns
-    -------
-    list of dict
-        {'id': int, 'i_d': node_id, 'j_d': node_id, 't_d': int}
-        t_d is the pickup hour of day (0-23) -- this loader operates at
-        native hourly resolution, matching the source data's granularity.
-        One demand per (origin, dest, hour), first occurrence in file
-        order kept on duplicates.
-    """
+    """Load one day of Chicago taxi trips as ride demands. node_map filters to known
+    network nodes; t_d is pickup hour (0-23). One demand per (origin, dest, hour),
+    first occurrence kept. Returns [{'id', 'i_d', 'j_d', 't_d'}, ...]."""
     df = pd.read_csv(path, low_memory=False)
     df['Trip Start Timestamp'] = pd.to_datetime(df['Trip Start Timestamp'])
     day = df[df['Trip Start Timestamp'].dt.date == pd.Timestamp(date).date()].copy()

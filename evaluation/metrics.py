@@ -1,16 +1,9 @@
-"""
-Evaluation metrics -- physical units only, no monetary conversions.
-
-Operate on plain Python sequences/dicts collected while running a
-Simulator + Scheduler loop (see runner.py's run() function for how to
-collect this history from a live simulation). No pandas/numpy
-dependency, matching the rest of the core framework.
-"""
+"""Evaluation metrics -- physical units only, no monetary conversions."""
 import statistics
 
 
 def peak_reduction(p_load_history, p_grid_history):
-    """Delta P (kW): how much the fleet shaved off the building's peak load."""
+    """Delta P (kW)."""
     return max(p_load_history) - max(p_grid_history)
 
 
@@ -24,10 +17,7 @@ def v2b_utilization(p_v2b_history, p_cons_history):
 
 def temporal_alignment(p_v2b_history, p_load_history):
     """Phi_i: Pearson correlation between fleet V2B availability and building load.
-
-    Low phi_i means fleet idle time and building peak are structurally
-    misaligned. Undefined (returns 0.0) if either series is constant.
-    """
+    Returns 0.0 if either series is constant (correlation undefined)."""
     if len(p_v2b_history) < 2 or len(set(p_v2b_history)) < 2 or len(set(p_load_history)) < 2:
         return 0.0
     return statistics.correlation(p_v2b_history, p_load_history)

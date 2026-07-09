@@ -1,11 +1,4 @@
-"""
-Visualization for a Simulator run's collected history. Publication-style
-formatting -- serif font, muted color palette, time-of-day x-axis,
-print-resolution PDF + PNG output -- so figures are ready to drop into a
-paper without reformatting. Always saves to file (not plt.show()) --
-robust regardless of whether a display is available, and gives you a
-file to compare across runs.
-"""
+"""Visualization for a Simulator run's collected history."""
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
@@ -24,9 +17,7 @@ plt.rcParams.update({
     "grid.linestyle":  "--",
 })
 
-# One color per building identity, cycled if there are more than 4.
-# Load = solid, grid draw = dashed of the same color -- linestyle
-# distinguishes a variant, color distinguishes identity.
+# color = building identity, linestyle = load vs. grid draw
 _BUILDING_COLORS = ["#1a6faf", "#e67e22", "#27ae60", "#c0392b"]
 _SOC_COLORS = plt.cm.tab10.colors
 
@@ -49,13 +40,7 @@ _GANTT_COLORS = {
 
 
 def _vehicle_segments(node_hist, arc_hist, p_hist, demand_flag_hist, building_nodes):
-    """
-    Collapse one vehicle's per-timestep (node, arc) history into merged
-    (t_start, t_end, kind, label) blocks for the Gantt panel. `kind` is one
-    of _GANTT_COLORS's keys. A block spanning multiple identical timesteps
-    (e.g. several parked timesteps in a row) becomes one bar, not one per
-    timestep, so labels stay readable.
-    """
+    """Merges consecutive identical timesteps into one Gantt block, so labels stay readable."""
     T = len(node_hist)
 
     def key_at(t):
@@ -63,14 +48,8 @@ def _vehicle_segments(node_hist, arc_hist, p_hist, demand_flag_hist, building_no
             return ("transit", arc_hist[t])
         node = node_hist[t]
         if node in building_nodes:
-            # Charge/discharge sign is part of the merge key, not just the
-            # node -- a vehicle sawtoothing at its SoC floor for hours
-            # (confirmed: chicago_scenario.py's heuristic run gets vehicles
-            # stuck alternating +-10kW every timestep once parked, since the
-            # heuristic never routes an idle vehicle away from a building
-            # with nothing else to do) would otherwise merge into ONE block
-            # labeled with the mean power -- which can look like a small,
-            # calm number while hiding a real 20kW swing every timestep.
+            # sign is part of the merge key -- otherwise a vehicle oscillating charge/discharge
+            # each timestep would collapse into one block with a misleading mean-power label
             return ("parked_building", node, p_hist[t] < 0)
         return ("parked", node)
 
@@ -84,13 +63,8 @@ def _vehicle_segments(node_hist, arc_hist, p_hist, demand_flag_hist, building_no
     if prev_key is not None:
         segs.append((seg_start, T - 1, prev_key))
 
-    # Labels only add value when a block is wide enough to read -- at hourly
-    # resolution with tau=1 arcs, most transit blocks are a single timestep,
-    # and a vehicle oscillating at a building now produces many 1-timestep
-    # building blocks too (see key_at above). Labeling every one of them
-    # just smears text across the whole row; color alone (+ the legend)
-    # already conveys what's happening, and summarize_fleet() has the exact
-    # numbers for any vehicle a reader wants to check.
+    # below this width labels just smear text -- color + legend already convey state,
+    # summarize_fleet() has the exact numbers
     MIN_LABEL_WIDTH = 2
 
     results = []
@@ -125,12 +99,8 @@ def _v2b_energy(node_hist, arc_hist, p_hist, building_nodes, dt):
 
 def summarize_fleet(node_hist, arc_hist, p_hist, demand_flag_hist, soc_hist,
                      building_nodes, dt):
-    """
-    One line per vehicle -- demand trips served, V2B discharge/charge blocks and
-    their total kWh, final SoC. Covers every vehicle, unlike the Gantt panel
-    (which only draws the top-N by V2B activity so it stays readable at any
-    fleet size) -- this is the complete record it's a summary of.
-    """
+    """One line per vehicle: trips served, V2B kWh, final SoC. Unlike the Gantt panel
+    (top-N only), this covers every vehicle."""
     lines = []
     for v_id in sorted(soc_hist):
         segs = _vehicle_segments(node_hist[v_id], arc_hist[v_id], p_hist[v_id],
@@ -152,31 +122,9 @@ def summarize_fleet(node_hist, arc_hist, p_hist, demand_flag_hist, soc_hist,
 def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
                        demand_flag_hist, soc_hist, building_nodes,
                        save_path, dt, s_min, s_max, top_n=5):
-    """
-    Triple-panel run figure: (A) building load vs. grid draw, (B) per-vehicle
-    schedule as a Gantt chart (parked-at-building / idle-at-depot / passenger
-    transit / deadhead transit), (C) vehicle SoC. Replaces the older
-    load+SoC-only plot_run -- adding the Gantt row is what actually shows a
-    V2B interaction happening (a vehicle parked at a building, discharging),
-    not just its downstream effect on the load curve.
-
-    Panels B and C draw only the top_n vehicles by total V2B energy exchanged
-    (charge + discharge kWh at a building) -- a fixed row-per-vehicle Gantt
-    doesn't scale to a 30-vehicle fleet, and the vehicles that never touch a
-    building aren't what this figure is showing. Every vehicle still shows up
-    in the fleet-wide text summary_fleet() produces -- nothing is lost, it's
-    just not all crammed into one figure. If the fleet has top_n or fewer
-    vehicles, all of them are shown (small_scenario.py's 5-vehicle fleet is
-    unaffected by this change).
-
-    p_load_hist, p_grid_hist                     : dict {b_id: [kW per t]}
-    node_hist, arc_hist, p_hist, demand_flag_hist : dict {v_id: [.. per t]},
-        as recorded by runner.py's run() -- node/arc describe where the
-        vehicle is during each timestep, p is the charge/discharge rate
-        actually applied, demand_flag marks a timestep whose departure
-        decision served a ride demand.
-    soc_hist                                      : dict {v_id: [SoC per t]}
-    """
+    """Triple-panel run figure: (A) load vs. grid draw, (B) per-vehicle Gantt schedule,
+    (C) SoC. Panels B/C show only the top_n vehicles by V2B energy exchanged;
+    summarize_fleet() covers the rest."""
     building_ids = list(p_load_hist)
     all_vehicles = sorted(soc_hist)
     ranked = sorted(
@@ -191,13 +139,7 @@ def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
     tick_x = list(range(0, 25, 4))
     tick_labels = [f"{h:02d}:00" for h in tick_x]
 
-    # Panel B needs real vertical room per row -- a rotated label ("i->j" or
-    # a kW figure on a narrow block) is drawn top-to-bottom, so a cramped row
-    # clips it regardless of font size. Scale both total figure height and
-    # panel B's share of it with vehicle count, rather than a fixed split.
-    # No fig-level suptitle -- that space goes to the Gantt panel instead;
-    # `title` is dropped rather than relocated onto an axes title, so it
-    # doesn't eat into the same space it was just freed from.
+    # figure height scales with vehicle count so rotated labels have room
     n_v = max(len(vehicles), 1)
     fig, (ax_load, ax_gantt, ax_soc) = plt.subplots(
         3, 1, figsize=(7.0, 3.2 + 0.8 * n_v),
@@ -217,11 +159,7 @@ def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
     ax_load.set_xticks(tick_x)
     ax_load.set_xticklabels([])
     ax_load.set_xlim(0, max(hours))
-    # Legend anchored above the axes, same fix as panel B's -- an in-axes
-    # corner ("upper left") collides with real data whenever the load curve
-    # rises early or spans most of the y-range, which chicago_scenario.py's
-    # larger synthetic load does. Title gets matching pad so it renders
-    # above the legend instead of underneath it.
+    # anchored above axes -- an in-axes corner can collide with the load curve depending on scenario
     ax_load.set_title("A   Building load vs. grid draw", loc="left", fontsize=9, pad=22)
     ax_load.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), fontsize=7,
                     ncol=2, framealpha=0.9, borderaxespad=0.2)
@@ -254,9 +192,7 @@ def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
     gantt_title = (f"B   Vehicle schedule (top {top_n} of {len(all_vehicles)} by V2B activity)"
                    if truncated else "B   Vehicle schedule")
     ax_gantt.set_title(gantt_title, loc="left", fontsize=9, pad=22)
-    # Anchored above the axes (not "upper right" inside it) so it never sits
-    # on top of a busy row -- row occupancy varies by scenario/vehicle count,
-    # an in-axes corner can't be picked once and trusted to stay clear.
+    # anchored above axes, same reasoning as panel A's legend
     ax_gantt.legend(handles=[
         mpatches.Patch(color=_GANTT_COLORS["building_discharge"], label="Discharging (V2B)"),
         mpatches.Patch(color=_GANTT_COLORS["building_charge"], label="Charging"),
@@ -292,15 +228,7 @@ def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
 
 
 def plot_comparison(p_load_hist, grid_hists_by_scheduler, title, save_path, dt=1.0):
-    """
-    The actual comparison figure: one building load curve, one grid-draw
-    line per scheduler overlaid on it -- same scenario, same building,
-    different decision-maker. One subplot per building.
-
-    p_load_hist              : dict {b_id: [kW per timestep]}
-    grid_hists_by_scheduler  : dict {scheduler_name: {b_id: [kW per timestep]}}
-    save_path                : path without extension -- saves .pdf and .png
-    """
+    """One grid-draw line per scheduler overlaid on building load, one subplot per building."""
     building_ids = list(p_load_hist)
     T = len(next(iter(p_load_hist.values())))
     hours = [t * dt for t in range(T)]

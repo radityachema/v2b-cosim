@@ -2,7 +2,7 @@
 
 Raw data is not committed (see `.gitignore`). Download and place files at
 the paths below before running `runner.py` — it reads from these fixed
-locations, for either the `real` or `chicago` scenario.
+locations, for either the `small` or `chicago` scenario.
 
 ## Fleet data — Chicago Taxi Trips
 

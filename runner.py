@@ -1,18 +1,5 @@
-"""
-Plug-and-play demo: one Simulator, built from real Chicago Taxi + BDG2
-data. Pick a scenario and a Scheduler to run it with -- that's the whole
-demo. Add your own BaseScheduler subclass to SCHEDULERS below; nothing
-else here needs to change.
-
-Pick "all" to run every scheduler against the identical scenario -- each
-gets its own triple-panel plot + fleet summary, plus one extra comparison
-plot overlaying every scheduler's grid draw on the same building load
-curve, so both the per-scheduler detail and the direct comparison are
-available.
-
-For a fast, dependency-free correctness check instead of exploration,
-see tests/test_heuristic.py.
-"""
+"""Interactive demo: pick a scenario + scheduler, run one Simulator loop.
+Add new schedulers to SCHEDULERS below. See tests/test_heuristic.py for a non-interactive check."""
 from pathlib import Path
 
 from simulator import Simulator
@@ -24,12 +11,8 @@ from scenarios.chicago_scenario import build_scenario as build_chicago_scenario
 from evaluation import metrics
 from evaluation.plotting import plot_triple_panel, plot_comparison, summarize_fleet
 
-# Both scenarios carry every field every scheduler needs (Null, Heuristic, or
-# MILP), and both use real Chicago Taxi Trips data -- "small" isn't more
-# real than "chicago", it's just a smaller/faster network (it additionally
-# uses real BDG2 building data; chicago's building load is synthetic). The
-# actual difference that matters when picking one is scale and MILP solve
-# time -- see scenarios/chicago_scenario.py for what's tuned there and why.
+# both use real Chicago Taxi data; only 'chicago' also uses real BDG2 building load.
+# difference is scale/solve-time -- see chicago_scenario.py.
 SCENARIOS = {
     'small': (build_small_scenario, "5 vehicles, 3 nodes -- fast, seconds to solve"),
     'chicago': (build_chicago_scenario, "larger real Chicago-scale network -- see chicago_scenario.py for current size/solve-time notes"),
@@ -80,16 +63,8 @@ def run(scenario, scheduler, label):
 
         t = state['t']
         for b in sim.buildings.buildings:
-            # Total electrical demand, not just the raw pre-HVAC load_profile
-            # value -- for Mode B buildings (rc populated, e.g. chicago_scenario.py)
-            # p_hvac can add up to hvac_max on top of load, and grid draw
-            # (p_grid = total_load - p_cons) legitimately includes it. Recording
-            # only the raw load here made grid draw appear to exceed "load" and
-            # made peak_reduction() go negative (max(p_load) undercounted the
-            # true peak) -- confirmed directly against chicago_scenario.py
-            # (Building 2 hvac_max=80 produced peak_reduction=-80.00 kW).
-            # p_hvac is always 0.0 for Mode A buildings (rc=None), so this is a
-            # no-op there -- small_scenario.py's numbers are unaffected.
+            # includes p_hvac -- grid draw already includes it (p_grid = total_load - p_cons),
+            # so peak_reduction needs the same total to compare against. No-op for Mode A (p_hvac=0).
             p_load_hist[b.b_id].append(b.load_profile.get(t, 0.0) + b.p_hvac)
             p_grid_hist[b.b_id].append(b.p_grid)
             p_cons_hist[b.b_id].append(b.p_cons)
@@ -161,9 +136,7 @@ if __name__ == '__main__':
         dt = scenario_for_plot['dt']
         building_nodes = set(scenario_for_plot['network'].building_nodes)
 
-        # One triple panel + fleet summary per scheduler that actually ran --
-        # "all" used to only produce the comparison overlay below, which shows
-        # grid draw but not any scheduler's individual Gantt/SoC behavior.
+        # per-scheduler detail plot; the comparison overlay below is additional, not a replacement
         for n in names:
             r = results[n]
             path = f"outputs/run_{n}"
@@ -175,9 +148,7 @@ if __name__ == '__main__':
                 s_min=scenario_for_plot['S_min'], s_max=scenario_for_plot['S_max'],
             )
             print(f"  Saved {n} plot to {path}.pdf / {path}.png")
-            # The Gantt/SoC panels only draw the top-N most V2B-active
-            # vehicles so the figure stays readable at any fleet size --
-            # this fills in the rest as text, one line per vehicle.
+            # fills in the vehicles the top-N Gantt/SoC panels don't show
             print(f"Fleet summary for {n} ({len(r['soc_hist'])} vehicles):")
             print(summarize_fleet(
                 r['node_hist'], r['arc_hist'], r['p_hist'], r['demand_flag_hist'],

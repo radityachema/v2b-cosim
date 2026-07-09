@@ -1,8 +1,6 @@
 class Building:
     def __init__(self, b_id, load_profile, n_chargers, rc=None, weather=None):
         self.b_id = b_id
-        # Mode A: pass full BDG2 measured load (HVAC already included)
-        # Mode B: pass non-HVAC load only — strip HVAC from BDG2 before passing in
         self.load_profile = load_profile
         self.n_chargers = n_chargers
         self.rc = rc

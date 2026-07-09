@@ -1,23 +1,5 @@
-"""
-Small scenario: Chicago Taxi trips for fleet demand, BDG2 electricity +
-weather for building load/thermal. runner.py's "small" scenario -- fast to
-solve (5 vehicles, 3 nodes), used as the default quick-start demo. Every
-scheduler (Null, Heuristic, MILP) runs against these exact same objects,
-so comparisons are genuine, not staged.
-
-Not "the real one" versus chicago_scenario.py -- both use real Chicago Taxi
-Trips data. This one additionally uses real BDG2 building load/weather;
-chicago_scenario.py uses synthetic building load at a much larger fleet/
-network scale instead. The distinction between the two is scale and solve
-time, not realness.
-
-No BDG2 site is actually in Chicago (checked directly -- closest US_Central
-sites are Austin, TX and Minneapolis, MN). This pairs a real Chicago fleet
-demand day with a real BDG2 building's load/weather from a different city.
-That's fine for demonstrating the loaders + scheduler + metrics pipeline
-works end-to-end on real data -- it is not a claim about a geographically
-coherent deployment.
-"""
+"""Small quick-start scenario: real Chicago Taxi demand + real BDG2 building load/weather,
+5 vehicles, 3 nodes. See chicago_scenario.py for a larger, synthetic-load variant."""
 from pathlib import Path
 
 from simulator.network import NetworkClass
@@ -53,24 +35,16 @@ S_INIT = 0.8
 N_CHARGERS = 5
 Q_BLDG = N_CHARGERS * P_BAR
 
-# MILP demand-service floor. lam=1.0 (serve every demand) is checked and
-# genuinely infeasible: 5 vehicles can't cover 133 real, often-overlapping
-# trip times in one day. lam=0.3 is the largest value that solves in
-# reasonable time (0.5 doesn't finish) -- a real fleet-size limit, not an
-# arbitrary choice.
+# MILP demand-service floor; lam=1.0 is infeasible at this fleet size, lam=0.3 is the
+# largest value that solves in reasonable time.
 LAM = 0.3
 
 BUILDING_METER_ID = {1: 'Panther_office_Catherine', 2: 'Panther_office_Hannah'}
 
 
 def build_scenario():
-    # Known simplification: unlike chicago_scenario.py (which computes real
-    # haversine distances between Chicago community areas), every arc here
-    # gets the same placeholder {tau, e, d} regardless of which two nodes it
-    # connects. The fleet/ride-demand/building data is real; the road network
-    # between them is not. Fine for demonstrating the loaders + scheduler +
-    # metrics pipeline end-to-end, not a claim about real travel times/costs
-    # between these specific Chicago community areas.
+    # placeholder arcs (same {tau, e, d} for every pair) -- unlike chicago_scenario.py,
+    # real travel times aren't modeled here
     network = NetworkClass(
         nodes=set(NODE_MAP.values()),
         arcs={
@@ -95,13 +69,8 @@ def build_scenario():
         for b in BUILDING_NODES
     }
 
-    # Mode A (rc=None): AC setpoint is a constant for this paper's published
-    # checkpoint, not a decision any scheduler makes (postdoc review,
-    # 2026-07-07, asked to drop thermal setpoint decisions and focus only on
-    # V2B power interactions -- since extended to MILPScheduler too, which
-    # no longer has a thermal decision variable at all). `weather` is still
-    # loaded and passed through -- harmless with rc=None, and means flipping
-    # a building back to Mode B later is a one-line change, not a re-fetch.
+    # Mode A: rc=None, no thermal decision for this scenario. weather is loaded anyway
+    # so switching to Mode B later is a one-line change.
     buildings = BuildingClass([
         Building(b_id=b, load_profile=dict(load_profile[b]), n_chargers=N_CHARGERS,
                  rc=None, weather=weather)
