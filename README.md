@@ -4,6 +4,8 @@ A co-simulation framework for Vehicle-to-Building (V2B) fleet energy management 
 
 The framework separates the physical world from the decision-maker. A **Simulator** holds the road network, ride demand, fleet, and buildings, and steps the physics forward one timestep at a time. A **Scheduler** reads the current state and returns decisions — route, power dispatch, HVAC — without knowing or caring whether it's a heuristic, an LP, or a learned policy. Swap the Scheduler without touching the Simulator.
 
+Each scheduler's full mathematical formulation lives next to its implementation: [scheduler/heuristic/README.md](scheduler/heuristic/README.md) (Algorithm 1), [scheduler/milp/README.md](scheduler/milp/README.md) (Model 1, mapped constraint-by-constraint against the original notation).
+
 ![Architecture](docs/Architecture.png)
 
 ## Architecture
@@ -60,7 +62,9 @@ simulator/
 scheduler/
   base/            BaseScheduler (abstract contract) + NullScheduler
   heuristic/       HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
+                     README.md: full formalization (notation, Algorithm 1, complexity)
   milp/            MILPScheduler (pre-solved day-ahead comparison) + _model.py (the Pyomo MILP itself)
+                     README.md: full formalization (notation, Model 1, all 16 constraints)
 runner.py           plug-and-play demo -- pick a scenario ("small" or "chicago"), a scheduler (or "all"), optionally plot
 tests/test_heuristic.py  non-interactive correctness check (asserts, no test framework)
 data/loaders/

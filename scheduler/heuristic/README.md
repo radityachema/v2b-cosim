@@ -2,8 +2,6 @@
 
 Constrained opportunistic discharge rule (fleet); constant, undecided setpoint (buildings).
 
-Symbols match `99_Extras/Documents/cosim_architecture_math.md` and `v3_simplified_peak_shaving.md` (same $\mathcal{V}, \mathcal{N}^B, \mathcal{D}, S_{v,t}, \bar{P}$ used by the MILP formulation).
-
 ## Notation
 
 | Symbol | Meaning |
@@ -51,10 +49,6 @@ $$P_{v,i,t} = \begin{cases} -\bar{P}_v & \text{if } S_{v,t} \geq S^{res} \quad \
 
 **Complexity:** $O(|\mathcal{V}| \cdot (|\mathcal{D}_t| + |\mathcal{N}^B|))$ per timestep -- demand lookup is amortized $O(1)$ via an origin-grouped index (`_decide_fleet`); the nearest-building search is a linear scan over $\mathcal{N}^B$.
 
-## Notes
-
-- $S^{res}$ is a fixed constant, not $S^{floor}_{v,t} = e_{o_{d^*}, \delta_{d^*}} + S^{res}$ (the dynamic next-trip-energy floor from `cosim_architecture_math.md`) -- the simulator exposes no forward demand visibility (`d^*`, the next assigned demand, isn't knowable), so the dynamic term is dropped and $S^{res}$ is used directly as the whole floor. Documented simplification, not an oversight.
-- No thermal decision: every building setpoint is constant (`None`) for this paper's published scope, which is V2B-only. `Building.step()` (`simulator/building.py`) still supports a real thermal decision (Mode B) if a future scheduler wants one.
 
 <details>
 <summary>LaTeX source (algorithm + algpseudocode)</summary>
@@ -93,8 +87,3 @@ $$P_{v,i,t} = \begin{cases} -\bar{P}_v & \text{if } S_{v,t} \geq S^{res} \quad \
 \end{algorithmic}
 \end{algorithm}
 ```
-
-</details>
-
----
-Part 1 of 2. See `scheduler/milp/README.md` for Part 2.

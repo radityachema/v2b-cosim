@@ -2,8 +2,6 @@
 
 Day-ahead joint routing + V2B dispatch MILP, solved once at construction. No thermal term -- matches the original notation's scope, not a reduction from it.
 
-Symbols match `99_Extras/Documents/cosim_architecture_math.md` and `v3_simplified_peak_shaving.md`. Sets/parameters match `v3_simplified_peak_shaving.md` exactly; variables add $dep$, not present there.
-
 ## Notation
 
 | Symbol | Meaning |
@@ -40,39 +38,30 @@ $$\min\ Z^{peak}$$
 
 1. Single state -- $\sum_{i,j \in \mathcal{N}} x_{v,i,j,t} = 1 \quad \forall v,t$
 2. Flow conservation -- $x_{v,i,j,t} \leq x_{v,i,j,t+1} + \sum_k x_{v,j,k,t+1} \quad \forall v,i,j,\ t<T-1$
-3. Transit duration **[modified]**
+3. Transit duration
    $$\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \leq \tau_{ij} + M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big)$$
    $$\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \geq \tau_{ij} - M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big)$$
    $\forall v \in \mathcal{V},\ \forall i,j \in \mathcal{N}\ (i\neq j),\ \forall t$. Replaces the original's separate Min-transit / Max-transit pair with one big-M mechanism, gated inline on $x_{v,i,j,t}-x_{v,i,j,t-1}$ (1 exactly at a departure, $\leq 0$ otherwise). Deliberately not tied to $dep$ (Constraint 6) -- different purpose, no need to share machinery.
 4. Initial position -- $x_{v,c,c,0} = 1 \quad \forall v$
 5. Terminal position -- $x_{v,c,c,T-1} = 1 \quad \forall v$
-6. Departure indicator **[new]** -- $dep_{v,i,j,t} \leq x_{v,i,j,t}$,   $dep_{v,i,j,t} \leq 1-x_{v,i,j,t-1}$,   $dep_{v,i,j,t} \geq x_{v,i,j,t}-x_{v,i,j,t-1}$. Standard AND-linking; not read by any other constraint, only by `MILPScheduler` for a direct per-timestep lookup instead of pattern-matching $x$'s solved trajectory.
+6. Departure indicator  -- $dep_{v,i,j,t} \leq x_{v,i,j,t}$,   $dep_{v,i,j,t} \leq 1-x_{v,i,j,t-1}$,   $dep_{v,i,j,t} \geq x_{v,i,j,t}-x_{v,i,j,t-1}$. Standard AND-linking; not read by any other constraint, only by `MILPScheduler` for a direct per-timestep lookup instead of pattern-matching $x$'s solved trajectory.
 7. Peak bounding -- $Z^{peak} \geq P^L_{i,t} + \sum_v P_{v,i,t} \quad \forall i \in \mathcal{N}^B, t$
 8. SoC initialization -- $S_{v,0} = S^{init} \quad \forall v$
-9. SoC terminal recovery **[new]** -- $S_{v,T} \geq S^{init} \quad \forall v$. Fleet must end the horizon at least as charged as it started -- not in the original, which only bounded SoC within $[S^{min}, S^{max}]$.
+9. SoC terminal recovery  -- $S_{v,T} \geq S^{init} \quad \forall v$. Fleet must end the horizon at least as charged as it started -- not in the original, which only bounded SoC within $[S^{min}, S^{max}]$.
 10. SoC dynamics -- $S_{v,t+1} = S_{v,t} + \sum_{i \in \mathcal{N}^B} P_{v,i,t}\Delta t / E^{cap} - \sum_{i,j} x_{v,i,j,t}\cdot(e_{ij}/\tau_{ij}) \quad \forall v,t$
 11. Power linkage -- $-\bar{P}\cdot x_{v,i,i,t} \leq P_{v,i,t} \leq \bar{P}\cdot x_{v,i,i,t} \quad \forall v, i \in \mathcal{N}^B, t$
-12. Building charger capacity **[new]** -- $-Q^{bldg} \leq \sum_v P_{v,i,t} \leq Q^{bldg} \quad \forall i \in \mathcal{N}^B, t$. Aggregate power at a building node is capped by installed charger hardware, independent of how many vehicles happen to be parked there -- distinct from the per-vehicle $\bar{P}$ cap in Constraint 11.
-13. Ride-route coupling **[split]** -- $y_{v,d} \leq x_{v,i_d,j_d,t_d}$,   $y_{v,d} \leq 1 - x_{v,i_d,j_d,t_d-1}$ $\quad \forall v,d$. Same binding behavior as the original's single inequality $y_{v,d} \leq x_{t_d} - x_{t_d-1}$, implemented as two upper bounds.
+12. Building charger capacity  -- $-Q^{bldg} \leq \sum_v P_{v,i,t} \leq Q^{bldg} \quad \forall i \in \mathcal{N}^B, t$. Aggregate power at a building node is capped by installed charger hardware, independent of how many vehicles happen to be parked there -- distinct from the per-vehicle $\bar{P}$ cap in Constraint 11.
+13. Ride-route coupling  -- $y_{v,d} \leq x_{v,i_d,j_d,t_d}$,   $y_{v,d} \leq 1 - x_{v,i_d,j_d,t_d-1}$ $\quad \forall v,d$. Same binding behavior as the original's single inequality $y_{v,d} \leq x_{t_d} - x_{t_d-1}$, implemented as two upper bounds.
 14. Ride assignment -- $\sum_v y_{v,d} \leq 1 \quad \forall d$
 15. Vehicle capacity -- $\sum_{d \in \mathcal{D}_t} y_{v,d} \leq 1 \quad \forall v,t$
 16. Demand fulfillment -- $\sum_v \sum_d y_{v,d}\,\ell_d \geq \lambda \sum_d \ell_d$. Only added when $\lambda>0$ and total requested distance $>0$. Equivalent to the original's $\rho \geq \lambda$ with $\rho$ substituted directly, no separate $\rho$ variable.
 
 **Complexity:** $O(|\mathcal{V}|\cdot|\mathcal{N}|^2\cdot T)$ binary variables dominate ($x$); solved once via Gurobi (MILP, no polynomial-time guarantee), cached to `plan_path` so later constructions load instead of re-solving.
 
-## Changes from v3_simplified_peak_shaving.md
-
-No thermal/HVAC term -- matches the original's scope exactly (an interim thermal extension was tried in an earlier version of this model and then removed; see `_model.py`'s own docstring). Four real additions: the $dep$ variable (6), SoC terminal recovery (9), and building charger capacity (12) are new constraints; transit duration (3) is reformulated as a single big-M mechanism in place of the original's two separate constraints.
-
 ## Notes
 
 - `MILPScheduler` solves this model once (Pyomo + Gurobi) and caches the plan; `decide()` is then a stateless lookup, not a re-solve.
 - Unlike the heuristic, the MILP has full-day foresight and a hard demand-service floor $\lambda$ the heuristic has no equivalent of -- both structural advantages, not tuning. Reported comparisons should give peak reduction and demand fulfillment together, never peak reduction alone.
-
-## Implementation notes (`_model.py`, not part of Model 1 itself)
-
-- `solver.solve(..., load_solutions=False)`: Pyomo's default auto-load raises a raw `ValueError` ("Cannot load a SolverResults object with bad status: aborted") when the time limit is hit before Gurobi finds any feasible integer solution. Checking the termination condition ourselves first lets `MILPScheduler` raise a clean, informative `RuntimeError` instead.
-- Incumbent check: the right question is "does Gurobi have an incumbent to hand back," not "did it prove that incumbent optimal" -- `termination_condition` alone conflates those. Hitting the time limit with a good incumbent (Upper bound finite) reports the same `maxTimeLimit` termination as hitting it with zero incumbents (Upper bound stays `inf`); checking only `termination_condition` discarded perfectly usable near-optimal plans (confirmed: `small_scenario.py` at `time_limit=30` found a 0.41%-from-optimal incumbent this used to throw away).
 
 <details>
 <summary>LaTeX source (standalone equations)</summary>
