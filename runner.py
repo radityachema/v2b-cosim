@@ -45,7 +45,9 @@ def run(scenario, scheduler, label):
         state = sim.get_state()
         decisions = scheduler.decide(state)
 
-        due_arcs = {(d['i_d'], d['j_d']): d['id'] for d in state['demands']}
+        due_arcs = {}
+        for d in state['demands']:
+            due_arcs.setdefault((d['i_d'], d['j_d']), []).append(d['id'])
         for v_state, dec in zip(state['fleet'], decisions['fleet']):
             v_id = v_state['v_id']
             # A vehicle already mid-transit keeps its existing arc; otherwise
@@ -54,10 +56,11 @@ def run(scenario, scheduler, label):
             current_arc = v_state['arc'] if v_state['arc'] is not None else dec['arc']
             arc_hist[v_id].append(current_arc)
             node_hist[v_id].append(v_state['node'] if current_arc is None else None)
-            is_demand = dec['arc'] in due_arcs
+            ids_here = due_arcs.get(dec['arc'])
+            is_demand = bool(ids_here)
             demand_flag_hist[v_id].append(is_demand)
             if is_demand:
-                served_ids.add(due_arcs[dec['arc']])
+                served_ids.add(ids_here.pop())
 
         sim.step(decisions)
 

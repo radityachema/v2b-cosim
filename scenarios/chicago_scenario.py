@@ -32,7 +32,6 @@ S_MIN = 0.1
 S_MAX = 0.9
 S_INIT = 0.8
 Q_BLDG = 200.0
-N_BAY = 5
 LAM = 1.0
 
 
@@ -190,7 +189,6 @@ def build_scenario():
         'S_max': S_MAX,
         'S_init': S_INIT,
         'Q_bldg': Q_BLDG,
-        'N_bay': N_BAY,
         'T': T,
         'dt': DT,
     }
