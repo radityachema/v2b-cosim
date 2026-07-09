@@ -41,8 +41,9 @@ $$\min\ Z^{peak}$$
 1. Single state -- $\sum_{i,j \in \mathcal{N}} x_{v,i,j,t} = 1 \quad \forall v,t$
 2. Flow conservation -- $x_{v,i,j,t} \leq x_{v,i,j,t+1} + \sum_k x_{v,j,k,t+1} \quad \forall v,i,j,\ t<T-1$
 3. Transit duration **[modified]**
-   $$\tau_{ij} - M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big) \leq \sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \leq \tau_{ij} + M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big)$$
-   $\forall v,\ i\neq j,\ t$. Replaces the original's separate Min-transit / Max-transit pair with one big-M mechanism, gated inline on $x_{v,i,j,t}-x_{v,i,j,t-1}$ (1 exactly at a departure, $\leq 0$ otherwise). Deliberately not tied to $dep$ (Constraint 6) -- different purpose, no need to share machinery.
+   $$\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \leq \tau_{ij} + M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big)$$
+   $$\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \geq \tau_{ij} - M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big)$$
+   $\forall v \in \mathcal{V},\ \forall i,j \in \mathcal{N}\ (i\neq j),\ \forall t$. Replaces the original's separate Min-transit / Max-transit pair with one big-M mechanism, gated inline on $x_{v,i,j,t}-x_{v,i,j,t-1}$ (1 exactly at a departure, $\leq 0$ otherwise). Deliberately not tied to $dep$ (Constraint 6) -- different purpose, no need to share machinery.
 4. Initial position -- $x_{v,c,c,0} = 1 \quad \forall v$
 5. Terminal position -- $x_{v,c,c,T-1} = 1 \quad \forall v$
 6. Departure indicator **[new]** -- $dep_{v,i,j,t} \leq x_{v,i,j,t}$,   $dep_{v,i,j,t} \leq 1-x_{v,i,j,t-1}$,   $dep_{v,i,j,t} \geq x_{v,i,j,t}-x_{v,i,j,t-1}$. Standard AND-linking; not read by any other constraint, only by `MILPScheduler` for a direct per-timestep lookup instead of pattern-matching $x$'s solved trajectory.
@@ -97,7 +98,8 @@ $$\min\ Z^{peak}$$
 \begin{align}
 &\sum_{i,j \in \mathcal{N}} x_{v,i,j,t} = 1 && \forall v,t \label{c:single}\\
 &x_{v,i,j,t} \leq x_{v,i,j,t+1} + \sum_{k} x_{v,j,k,t+1} && \forall v,i,j,\ t<T-1 \label{c:flow}\\
-&\tau_{ij} - M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big) \leq \sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \leq \tau_{ij} + M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big) && \forall v, i{\neq}j, t \label{c:transit}\\
+&\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \leq \tau_{ij} + M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big) && \forall v, i{\neq}j, t \label{c:transit-up}\\
+&\sum_{k=t}^{t+\tau_{ij}} x_{v,i,j,k} \geq \tau_{ij} - M\big(1-(x_{v,i,j,t}-x_{v,i,j,t-1})\big) && \forall v, i{\neq}j, t \label{c:transit-lo}\\
 &x_{v,c,c,0} = 1 && \forall v \label{c:init}\\
 &x_{v,c,c,T-1} = 1 && \forall v \label{c:term}\\
 &dep_{v,i,j,t} \leq x_{v,i,j,t},\quad dep_{v,i,j,t} \leq 1-x_{v,i,j,t-1},\quad dep_{v,i,j,t} \geq x_{v,i,j,t}-x_{v,i,j,t-1} && \forall v,i{\neq}j,t \label{c:dep}\\
@@ -113,8 +115,3 @@ $$\min\ Z^{peak}$$
 &\sum_{v}\sum_{d} y_{v,d}\,\ell_d \geq \lambda \sum_{d} \ell_d \label{c:fulfill}
 \end{align}
 ```
-
-</details>
-
----
-Part 2 of 2. See `scheduler/heuristic/README.md` for Part 1.
