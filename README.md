@@ -107,7 +107,7 @@ For a fast, dependency-free correctness check instead of exploration (no data fi
 
 ```bash
 python -m tests.test_heuristic
-python -m tests.test_adversarial  # fuzzer: extreme/NaN/inf decisions, confirms Vehicle/Building.step() clamp regardless
+python -m tests.test_adversarial  # 7 adversarial scheduler designs x every available scenario -- clamping holds regardless
 ```
 
 ## Plug in your own scheduler
