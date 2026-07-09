@@ -1,15 +1,22 @@
 """
-Real-data scenario: Chicago Taxi trips for fleet demand, BDG2 electricity +
-weather for building load/thermal. This is the ONE canonical scenario --
-every scheduler (Null, Heuristic, MILP) runs against these exact same
-objects, so comparisons are genuine, not staged.
+Small scenario: Chicago Taxi trips for fleet demand, BDG2 electricity +
+weather for building load/thermal. runner.py's "small" scenario -- fast to
+solve (5 vehicles, 3 nodes), used as the default quick-start demo. Every
+scheduler (Null, Heuristic, MILP) runs against these exact same objects,
+so comparisons are genuine, not staged.
+
+Not "the real one" versus chicago_scenario.py -- both use real Chicago Taxi
+Trips data. This one additionally uses real BDG2 building load/weather;
+chicago_scenario.py uses synthetic building load at a much larger fleet/
+network scale instead. The distinction between the two is scale and solve
+time, not realness.
 
 No BDG2 site is actually in Chicago (checked directly -- closest US_Central
 sites are Austin, TX and Minneapolis, MN). This pairs a real Chicago fleet
 demand day with a real BDG2 building's load/weather from a different city.
 That's fine for demonstrating the loaders + scheduler + metrics pipeline
-works end-to-end on real (not synthetic) data -- it is not a claim about a
-geographically coherent deployment.
+works end-to-end on real data -- it is not a claim about a geographically
+coherent deployment.
 """
 from pathlib import Path
 
@@ -53,32 +60,17 @@ Q_BLDG = N_CHARGERS * P_BAR
 # arbitrary choice.
 LAM = 0.3
 
-# Comfort band [18,30] deg C. A tighter [20,26] band was checked and found
-# infeasible against real BDG2 weather (up to 33 degC that day) combined
-# with the RC parameters below -- the weaker building's HVAC unit can't
-# out-cool that swing inside a tight band. [18,30] is a wider, still
-# plausible band for an unoccupied/lightly-occupied office.
-T_MIN = 18.0
-T_MAX = 30.0
-
-# RC thermal parameters, one set per building, sized to each building's own
-# real load range (checked directly against the meter data: Catherine
-# 18-67kW, Hannah 4-17kW) -- hvac_max is roughly 20-25% of each building's
-# own peak load, not a single reused placeholder value. Hannah's hvac_max
-# is 10kW rather than a more "proportionate" 3-5kW because a smaller value
-# was checked and found infeasible against real summer weather at the
-# comfort band above.
-RC_A = 0.05
-RC_B = 0.02
-T_INIT = 24.0
-RC_PARAMS = {
-    1: {'a': RC_A, 'b': RC_B, 'hvac_max': 15.0, 't_init': T_INIT},  # Catherine
-    2: {'a': RC_A, 'b': RC_B, 'hvac_max': 10.0, 't_init': T_INIT},  # Hannah
-}
 BUILDING_METER_ID = {1: 'Panther_office_Catherine', 2: 'Panther_office_Hannah'}
 
 
 def build_scenario():
+    # Known simplification: unlike chicago_scenario.py (which computes real
+    # haversine distances between Chicago community areas), every arc here
+    # gets the same placeholder {tau, e, d} regardless of which two nodes it
+    # connects. The fleet/ride-demand/building data is real; the road network
+    # between them is not. Fine for demonstrating the loaders + scheduler +
+    # metrics pipeline end-to-end, not a claim about real travel times/costs
+    # between these specific Chicago community areas.
     network = NetworkClass(
         nodes=set(NODE_MAP.values()),
         arcs={
@@ -103,9 +95,16 @@ def build_scenario():
         for b in BUILDING_NODES
     }
 
+    # Mode A (rc=None): AC setpoint is a constant for this paper's published
+    # checkpoint, not a decision any scheduler makes (postdoc review,
+    # 2026-07-07, asked to drop thermal setpoint decisions and focus only on
+    # V2B power interactions -- since extended to MILPScheduler too, which
+    # no longer has a thermal decision variable at all). `weather` is still
+    # loaded and passed through -- harmless with rc=None, and means flipping
+    # a building back to Mode B later is a one-line change, not a re-fetch.
     buildings = BuildingClass([
         Building(b_id=b, load_profile=dict(load_profile[b]), n_chargers=N_CHARGERS,
-                 rc=dict(RC_PARAMS[b]), weather=weather)
+                 rc=None, weather=weather)
         for b in BUILDING_NODES
     ])
 
@@ -129,9 +128,6 @@ def build_scenario():
         'vehicles_list': list(range(V)),
         'demands_milp': demands_milp,
         'load_profile': load_profile,
-        'rc_params': RC_PARAMS,
-        't_min': T_MIN,
-        't_max': T_MAX,
         'lam': LAM,
         'E_cap': E_CAP,
         'P_bar': P_BAR,

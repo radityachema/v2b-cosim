@@ -36,7 +36,7 @@ Fleet and building decisions are made simultaneously off the same snapshot — n
 **What's in `state`, exactly:**
 - `t`, `demands` (only pickups due this exact timestep — no future visibility)
 - `fleet`: per vehicle — `v_id, soc, node, arc, p` plus static hardware bounds `p_max, s_min, s_max, e_cap`
-- `buildings`: per building — `b_id, t_in, n_chargers, p_grid, p_cons` plus static thermal/hardware config `rc` (`a, b, hvac_max, t_init, t_sp_min, t_sp_max`, or `None` for Mode A)
+- `buildings`: per building — `b_id, t_in, n_chargers, p_grid, p_cons` plus static thermal/hardware config `rc` (`a, b, hvac_max, t_init, t_sp_min, t_sp_max`, or `None` for Mode A). Mode A = thermal-agnostic (full measured load, no `T_in` state); Mode B = thermal-aware (HVAC portion of load stripped out, reintroduced by the Scheduler's setpoint).
 - `p_v2b`: the one piece of real history — lagged one timestep, as above
 - `network`: static
 
@@ -44,7 +44,9 @@ Deliberately *not* included: any deeper history, or any future beyond the curren
 
 **Setpoint → power is fixed physics, not a decision.** `Building.step()` converts a setpoint into actual HVAC power itself, via a bang-bang relay (`if T_in > T_sp: run at hvac_max, else off`) — the same conversion regardless of which scheduler is plugged in, exactly like `Vehicle.step()` clamps any power value to `±p_max` regardless of who requested it. No scheduler can bypass this relay to set raw kW directly; every scheduler speaks in setpoints, and the Simulator owns the physical response to them.
 
-**Evaluation** (`evaluation/metrics.py`): peak reduction ΔP (kW), demand fulfillment ρ (%), V2B utilization η_v2b (%), temporal alignment φ_i (correlation between fleet availability and building load). `evaluation/plotting.py` renders load-vs-grid-draw (single run, or all schedulers overlaid on one axis for direct comparison) and vehicle SoC over time, saved as PDF + PNG.
+**None of the three schedulers this repo publishes (`NullScheduler`, `HeuristicScheduler`, `MILPScheduler`) actually make a thermal decision.** Every building setpoint they return is `None`, not a float -- `Building.step()` treats `t_sp=None` as "no decision," skipping the relay entirely (`p_hvac` stays 0; `T_in` still evolves passively toward outdoor temperature, since that's physics, not a decision). This paper's published checkpoint is V2B-only: AC setpoint is a constant, not a decision variable, for every scheduler and every scenario. The capability itself is still real -- `Building.step()`'s Mode B relay is unchanged, and a future scheduler can return an actual float to exercise it -- but reintroducing it is out of scope for what's published here.
+
+**Evaluation** (`evaluation/metrics.py`): peak reduction ΔP (kW), demand fulfillment ρ (%), V2B utilization η_v2b (%), temporal alignment φ_i (correlation between fleet availability and building load). `evaluation/plotting.py` renders either a single-run triple panel (building load vs. grid draw, a per-vehicle Gantt schedule, and SoC over time -- the Gantt/SoC panels draw only the top-5 most V2B-active vehicles so the figure stays readable at any fleet size; `summarize_fleet()` prints a one-line-per-vehicle text summary covering everyone else) or, for `all`-scheduler runs, one comparison plot with every scheduler's grid draw overlaid on the same building load curve. Always saved as PDF + PNG.
 
 ## Repo layout
 
@@ -56,40 +58,52 @@ simulator/
   building.py      Building + BuildingClass
   simulator.py     Simulator — steps all classes, computes P_v2b
 scheduler/
-  base.py          BaseScheduler (abstract contract) + NullScheduler
-  heuristic.py     HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
-  milp.py          MILPScheduler — pre-solved day-ahead comparison
-  _milp_model.py   Pyomo MILP model (routing + V2B + thermal)
-runner.py           plug-and-play demo -- one real-data scenario, pick a scheduler (or "all"), optionally plot
-experiments/milp_comparison.py  Heuristic vs MILP at a much larger, real Chicago-taxi-scale (30 vehicles, 317 demands)
+  base/            BaseScheduler (abstract contract) + NullScheduler
+  heuristic/       HeuristicScheduler — SoC-floor dispatch + bang-bang setpoint
+  milp/            MILPScheduler (pre-solved day-ahead comparison) + _model.py (the Pyomo MILP itself)
+runner.py           plug-and-play demo -- pick a scenario ("small" or "chicago"), a scheduler (or "all"), optionally plot
 tests/test_heuristic.py  non-interactive correctness check (asserts, no test framework)
 data/loaders/
   fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
   building.py      load_bdg2_load(), load_bdg2_weather() -- real building load + outdoor temp
 evaluation/
   metrics.py       ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
-  plotting.py      single-run and multi-scheduler-overlay plots, matplotlib, always saves PDF+PNG
+  plotting.py      single-run triple panel, multi-scheduler-overlay plot, fleet text summary
 scenarios/
   toy_scenario.py      3 vehicles, 2 buildings, no external files -- used by tests/ only
-  real_scenario.py     Chicago Taxi + BDG2, real data -- the ONE canonical scenario, used by runner.py.
-                       Carries every field any scheduler needs (Null, Heuristic, or MILP), so all three
-                       run against genuinely identical data -- no separate scenario per scheduler.
-  chicago_scenario.py  N=6/V=30/D=317 Chicago-scale replica -- used by experiments/milp_comparison.py only,
-                       for the much bigger comparison, not the main demo
+  small_scenario.py    Real Chicago Taxi ride demand + real BDG2 building load/weather -- the road
+                       network between nodes is a placeholder, not real travel data (see comment in
+                       the file). runner.py's "small" scenario (5 vehicles, 3 nodes). Carries every
+                       field any scheduler needs (Null, Heuristic, or MILP), so all three run
+                       against genuinely identical data -- no separate scenario per scheduler.
+  chicago_scenario.py  4 real Chicago community areas, 13 vehicles, 121 real demands -- runner.py's
+                       "chicago" scenario, a bigger/slower companion to "small" (synthetic building
+                       load instead of real BDG2). MILPScheduler's lambda=1.0 demand floor (kept at
+                       a hard 100%, not relaxed) solves in ~5s at this scale -- checked directly
+                       that the original 6-area/30-vehicle version does NOT solve within 300s even
+                       at lambda=0.0, so this is a smaller real network, not a relaxed problem.
 docs/Architecture.png  system diagram
 ```
 
 ## Quick start
 
+Dependencies: `pip install -r requirements.txt` (pandas, numpy, matplotlib, pyomo). `MILPScheduler` additionally requires a working [Gurobi](https://www.gurobi.com/) install with a license — free academic licenses are available. `NullScheduler` and `HeuristicScheduler` don't need Gurobi at all.
+
+`runner.py` needs two real datasets that aren't checked into this repo (see [data/README.md](data/README.md) for exact download links and paths) — put them in place before running.
+
 ```bash
 python runner.py
 ```
 
-Prompts for a scheduler (`NullScheduler`, `HeuristicScheduler`, `MILPScheduler`, or `all`), then whether to save a plot, then runs it against one fixed real-data scenario (Chicago Taxi + BDG2). Prints ΔP, η_v2b, φ_i, ρ for each. Pick `all` to run every scheduler against the identical scenario and get one comparison plot — the same building load curve with each scheduler's grid draw overlaid on it, so it's a genuine apples-to-apples comparison, not three separate experiments.
+Prompts for a scenario (`small`: 5 vehicles, 3 nodes, seconds to solve; `chicago`: 13 vehicles, 4 real Chicago community areas, 121 real demands, harder but still solves in ~5s), then a scheduler (`null`, `heuristic`, `milp`, or `all`), then whether to save a plot, then prints ΔP, η_v2b, φ_i, ρ for each. Pick `all` to run every scheduler against the identical scenario and get one comparison plot — the same building load curve with each scheduler's grid draw overlaid on it, so it's a genuine apples-to-apples comparison, not separate experiments.
 
-`MILPScheduler` solves in seconds against this scenario's small scale (5 vehicles, 3 nodes) — it's a real, satisfied instance of the `BaseScheduler` contract here, not a special case requiring different data. `experiments/milp_comparison.py` exists separately only because it runs the comparison at a much larger, more demanding scale (30 vehicles, 317 real demands) that takes minutes to solve — that's a scale choice, not an architectural one.
+`MILPScheduler` solves in seconds against either scenario — it's a real, satisfied instance of the `BaseScheduler` contract, not a special case requiring different data. Both keep `lambda=1.0` (100% demand-service floor) fixed rather than relaxed. `chicago_scenario.py` was originally 6 areas / 30 vehicles / 317 demands; checked directly that this does **not** solve within Gurobi's default time limit even at `lambda=0.0` (no demand constraint at all) -- the bottleneck is the routing formulation's combinatorial size, not the demand floor. The scenario now used is a smaller real network (4 areas / 13 vehicles / 121 real demands) found by testing V=10..20 directly: V≤14 solves in under 20s, V≥15 doesn't solve within 90s. `Null`/`HeuristicScheduler` run against either scenario the same way, no solver involved.
 
-For a fast, dependency-free correctness check instead of exploration, run `tests/test_heuristic.py`.
+For a fast, dependency-free correctness check instead of exploration (no data files or Gurobi needed):
+
+```bash
+python -m tests.test_heuristic
+```
 
 ## Plug in your own scheduler
 
@@ -108,6 +122,6 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-`runner.py` is the plug-and-play demo: `NullScheduler`, `HeuristicScheduler`, and `MILPScheduler` all run against the same real-data scenario (`scenarios/real_scenario.py`), verified end-to-end, including a real solved MILP result (peak reduction, V2B utilization, temporal alignment all computed identically for all three). `experiments/milp_comparison.py` runs the same comparison at a much larger scale (30 vehicles, 317 real demands) — same idea, bigger and slower to solve.
+`runner.py` is the plug-and-play demo: `NullScheduler`, `HeuristicScheduler`, and `MILPScheduler` all run against either scenario, verified end-to-end, all three computing peak reduction, V2B utilization, and temporal alignment. Against `small`, MILP uses `λ=0.3` (see below). Against `chicago`, MILP keeps a hard `λ=1.0` (100% demand service) and gets it: 100% demand fulfillment, positive peak reduction on both buildings, strong temporal alignment (checked directly: 0.735 / 0.685) — solved in ~5s.
 
-Two structural asymmetries are worth remembering when reading either comparison: the MILP has full-day foresight and a demand-service floor the heuristic doesn't have (checked directly: `λ=1.0`, i.e. serve every demand, is infeasible for the 5-vehicle real scenario — `λ=0.3` is the largest value that solves), so report peak reduction *and* demand fulfillment together, never peak reduction alone.
+Two structural asymmetries are worth remembering when reading a Heuristic-vs-MILP comparison: the MILP has full-day foresight the heuristic doesn't have, and (for `small`) a demand-service floor the heuristic has no equivalent of (checked directly: `λ=1.0`, i.e. serve every demand, is infeasible for the 5-vehicle `small` scenario — `λ=0.3` is the largest value that solves there; `chicago`'s smaller real network solves at the full `λ=1.0`). So report peak reduction *and* demand fulfillment together, never peak reduction alone.

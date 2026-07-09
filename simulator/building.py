@@ -24,8 +24,6 @@ class Building:
         }
 
     def step(self, t, p_v2b, t_sp=None):
-        # Bang-bang relay: fixed hardware response to a setpoint, same for every
-        # scheduler — not a decision, so it lives here rather than in the Scheduler.
         self.p_hvac = 0.0
         if self.rc is not None and t_sp is not None:
             t_sp = max(self.rc.get('t_sp_min', 16.0), min(self.rc.get('t_sp_max', 30.0), t_sp))

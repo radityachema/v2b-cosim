@@ -1,8 +1,8 @@
 # Data
 
 Raw data is not committed (see `.gitignore`). Download and place files at
-the paths below before running `runner.py` or `experiments/milp_comparison.py`
-— both read from these fixed locations.
+the paths below before running `runner.py` — it reads from these fixed
+locations, for either the `real` or `chicago` scenario.
 
 ## Fleet data — Chicago Taxi Trips
 
@@ -36,7 +36,7 @@ one site.
 Chicago fleet demand with a BDG2 building means a real-but-different-city
 building, not a geographically coherent deployment — fine for testing the
 pipeline end-to-end, not for claiming a coherent scenario without saying so.
-`scenarios/real_scenario.py` uses the "Panther" site (Orlando, FL) for this
+`scenarios/small_scenario.py` uses the "Panther" site (Orlando, FL) for this
 reason among others — it's simply a real building whose meter data was
 available, not a claim about Chicago building stock.
 
@@ -47,13 +47,16 @@ the real granularity of both source datasets, not resampled to 15-min. Build
 the `Simulator` for real-data runs with `dt=1.0`, not the synthetic toy
 scenario's default `dt=0.25`.
 
-## RC/HVAC parameters are not fitted to real buildings
+## No thermal (Mode B) decision in the published scenarios
 
-`Building(rc=...)` parameters (`a`, `b`, `hvac_max`) used in
-`scenarios/real_scenario.py` are hand-picked to be roughly proportionate to
-each building's own real load range and to keep the MILP feasible against
-real weather — they are not fitted to any specific building's actual
-measured thermal behavior. A poorly-scaled `hvac_max` relative to a
-building's real load can produce misleading results (e.g. a "worse" peak
-after adding HVAC control) — check parameter scale against the building's
-actual load range before trusting a Mode B result on different data.
+Both `scenarios/small_scenario.py` and `scenarios/chicago_scenario.py`
+construct every `Building` with `rc=None` (Mode A) -- AC setpoint is a
+constant for this paper's published checkpoint, not something any of the
+three schedulers decide. `Building.step()` (`simulator/building.py`)
+still supports Mode B (thermal-aware, RC dynamics + bang-bang relay) if
+a future scheduler wants to reintroduce a real thermal decision; that
+capability wasn't removed, only its use by the current scenarios/
+schedulers. If you do populate `rc=...` again, note that a poorly-scaled
+`hvac_max` relative to a building's real load can produce misleading
+results (e.g. a "worse" peak after adding HVAC control) -- check
+parameter scale against the building's actual load range.

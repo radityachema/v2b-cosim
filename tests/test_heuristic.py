@@ -36,9 +36,21 @@ if __name__ == '__main__':
         f"expected exactly 1 vehicle serving demand at t=10, got {demand_arc_count_at_t10}"
     print("PASS: seeded demand served exactly once at t=10 (dedup confirmed)")
 
+    # HeuristicScheduler makes no thermal decision -- AC setpoint is a
+    # constant (None) for this paper's published checkpoint, not something
+    # any scheduler decides. Confirm that directly rather than just via its
+    # downstream effect.
+    assert all(t_sp is None for t_sp in decisions['buildings'].values()), \
+        f"expected every building decision to be None (no thermal decision), got {decisions['buildings']}"
+    print("PASS: HeuristicScheduler makes no building thermal decision")
+
+    # Mode B building's t_in still moves -- but now via passive RC physics
+    # (drift toward outdoor temp) only, since p_hvac stays 0 with no
+    # setpoint decision. Confirms Building.step()'s RC dynamics still run
+    # on their own, independent of any scheduler decision.
     b_a_final = sim.buildings.buildings[0].t_in
-    assert b_a_final != b_a_t_init, f"Mode B building t_in did not move from t_init={b_a_t_init}"
-    print(f"PASS: Mode B building t_in moved from {b_a_t_init} to {b_a_final:.3f}")
+    assert b_a_final != b_a_t_init, f"Mode B building t_in did not passively drift from t_init={b_a_t_init}"
+    print(f"PASS: Mode B building t_in passively drifted from {b_a_t_init} to {b_a_final:.3f} (no active HVAC)")
 
     b_b = sim.buildings.buildings[1]
     assert b_b.t_in is None, "Mode A building should have no t_in"

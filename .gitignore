@@ -5,5 +5,5 @@ __pycache__/
 .env
 data/chicago_taxi_trips.csv
 data/bdg2/
-run_*.png
-run_*.pdf
+outputs/
+data/*.pkl

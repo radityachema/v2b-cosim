@@ -1,28 +1,4 @@
-"""
-Pure Pyomo model builder for the day-ahead joint routing + V2B dispatch +
-thermal MILP. No knowledge of this repo's Simulator/Scheduler classes --
-plain dicts/lists in, plain result dict out.
-
-Variables: x[v,i,j,t] (binary, 1 if vehicle v occupies arc (i,j) during
-timestep t -- including every timestep of a multi-step trip, not just
-departure), y[v,d] (binary, 1 if vehicle v serves demand d), P[v,i,t]
-(continuous signed power, vehicle v at building i, + = charging), S[v,t]
-(continuous SoC), Z_peak (the objective: minimize the worst building
-peak across all buildings and timesteps).
-
-dep[v,i,j,t] is an added binary variable, 1 only at the exact timestep
-a vehicle departs on arc (i,j), derived from `x` via a standard
-AND-linking constraint (not detected by pattern-matching after solving).
-This is what MILPScheduler reads to build a per-timestep decision -- a
-direct lookup, not a search over the solved `x` trajectory. `x` itself
-represents "occupying the arc" (needed for the SoC/transit-duration
-constraints), which doesn't directly tell you "did the vehicle just
-depart this timestep" -- `dep` answers that question directly.
-
-Network numbers (e, tau) are pulled from the actual NetworkClass instance
-passed in, never recomputed independently -- single source of truth with
-whatever Simulator will replay the plan through.
-"""
+"""Pyomo model builder for the day-ahead routing + V2B dispatch MILP. See README.md (Model 1)."""
 import pyomo.environ as pyo
 
 
@@ -41,9 +17,8 @@ def _tau(network, i, j):
 
 def build_and_solve_extended(
     network, vehicles_list, building_nodes, depot, demands_milp,
-    load_profile, rc_params, T, dt, E_cap, P_bar, S_min, S_max, S_init,
-    Q_bldg, lam, t_min=20.0, t_max=26.0, t_out=30.0,
-    time_limit=300, verbose=False,
+    load_profile, T, dt, E_cap, P_bar, S_min, S_max, S_init,
+    Q_bldg, lam, time_limit=300, verbose=False,
 ):
     nodes = list(network.nodes)
     m = pyo.ConcreteModel()
@@ -95,8 +70,7 @@ def build_and_solve_extended(
     m.c_init = pyo.Constraint(m.V, rule=lambda m, v: m.x[v, depot, depot, 0] == 1)
     m.c_term = pyo.Constraint(m.V, rule=lambda m, v: m.x[v, depot, depot, T - 1] == 1)
 
-    # -- departure variable: 1 only at the exact onset timestep of arc (i,j) --
-    def _dep_idx(m):
+    def _dep_idx(m):  # dep[v,i,j,t]: 1 only at departure onset -- see README.md (Constraint 6)
         for v in m.V:
             for i in m.N:
                 for j in m.N:
@@ -118,34 +92,8 @@ def build_and_solve_extended(
     m.c_dep_upper2 = pyo.Constraint(m.dep_idx, rule=c_dep_upper2)
     m.c_dep_lower = pyo.Constraint(m.dep_idx, rule=c_dep_lower)
 
-    # -- thermal extension --
-    m.t_in = pyo.Var(m.NB, pyo.RangeSet(0, T), domain=pyo.Reals)
-    m.z = pyo.Var(m.NB, m.TT, domain=pyo.Binary)
-    m.p_hvac = pyo.Var(m.NB, m.TT, domain=pyo.NonNegativeReals)
-
-    m.c_phvac = pyo.Constraint(m.NB, m.TT,
-        rule=lambda m, i, t: m.p_hvac[i, t] == rc_params[i]['hvac_max'] * m.z[i, t])
-
-    m.c_tin_init = pyo.Constraint(m.NB,
-        rule=lambda m, i: m.t_in[i, 0] == rc_params[i]['t_init'])
-
-    def c_tin_dyn(m, i, t):
-        a_i, b_i = rc_params[i]['a'], rc_params[i]['b']
-        return m.t_in[i, t + 1] == (1 - a_i) * m.t_in[i, t] + a_i * t_out - b_i * m.p_hvac[i, t]
-    m.c_tin_dyn = pyo.Constraint(m.NB, m.TT, rule=c_tin_dyn)
-
-    m.c_comfort_lo = pyo.Constraint(m.NB, pyo.RangeSet(0, T),
-        rule=lambda m, i, t: m.t_in[i, t] >= t_min)
-    m.c_comfort_hi = pyo.Constraint(m.NB, pyo.RangeSet(0, T),
-        rule=lambda m, i, t: m.t_in[i, t] <= t_max)
-
-    # Peak must include HVAC draw -- required, not optional: otherwise the
-    # thermal extension wouldn't count toward the peak it's supposed to shave.
-    # load_profile is per-building ({b_id: {t: kW}}) -- buildings can have
-    # genuinely different real load curves, not one shared synthetic profile.
-    m.c_peak = pyo.Constraint(m.NB, m.TT,
-        rule=lambda m, i, t: m.Zpeak >= load_profile[i][t] + m.p_hvac[i, t]
-                                        + sum(m.P[v, i, t] for v in m.V))
+    m.c_peak = pyo.Constraint(m.NB, m.TT,  # no HVAC term -- see README.md
+        rule=lambda m, i, t: m.Zpeak >= load_profile[i][t] + sum(m.P[v, i, t] for v in m.V))
 
     m.c_soc_init = pyo.Constraint(m.V, rule=lambda m, v: m.S[v, 0] == S_init)
 
@@ -194,10 +142,28 @@ def build_and_solve_extended(
 
     solver = pyo.SolverFactory('gurobi')
     solver.options['TimeLimit'] = time_limit
-    result = solver.solve(m, tee=verbose)
+    result = solver.solve(m, tee=verbose, load_solutions=False)  # load_solutions=False -- see README.md
 
     status = str(result.solver.status)
     term = str(result.solver.termination_condition)
+    upper = result.problem[0]['Upper bound'] if result.problem else None
+    has_incumbent = upper is not None and upper == upper and abs(upper) != float('inf')  # upper==upper: not NaN; incumbent, not proven-optimal -- see README.md
+
+    if has_incumbent:
+        m.solutions.load_from(result)
+        if term != str(pyo.TerminationCondition.optimal):
+            lower = result.problem[0]['Lower bound']
+            gap = abs(upper - lower) / abs(upper) if upper else 0.0
+            print(f"MILP: time_limit={time_limit}s reached before proving optimality "
+                  f"(status={status}, termination={term}) -- using best incumbent "
+                  f"found: {upper:.4f} (gap {gap:.2%} vs. proven bound {lower:.4f}).")
+    else:
+        bound = result.problem[0]['Lower bound'] if result.problem else None  # Gurobi's best proven bound (BestBd)
+        raise RuntimeError(
+            f"MILP found no feasible solution within time_limit={time_limit}s "
+            f"(status={status}, termination={term}, best_bound={bound}). "
+            f"Try a longer time_limit, or a less strict demand-service floor (lam)."
+        )
 
     return {
         'model': m,

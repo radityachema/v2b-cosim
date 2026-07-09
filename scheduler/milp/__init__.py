@@ -1,20 +1,23 @@
-"""
-MILPScheduler -- day-ahead, pre-solved comparison scheduler. Solves the
-entire horizon once at construction (Pyomo + Gurobi), then decide() is a
-stateless O(1) lookup into the pre-solved plan. Not the paper's main
-method -- a comparison baseline against HeuristicScheduler on identical
-scenario data. Works with any scenario dict that carries the fields
-`build_and_solve_extended()` needs (see scheduler/_milp_model.py) --
-scenarios/real_scenario.py and scenarios/chicago_scenario.py both do.
-"""
+"""Day-ahead MILP scheduler: solve once, decide() is a stateless lookup. See README.md (Model 1)."""
+import pickle
+from pathlib import Path
+
 import pyomo.environ as pyo
 
 from scheduler.base import BaseScheduler
-from scheduler._milp_model import build_and_solve_extended
+from scheduler.milp._model import build_and_solve_extended
 
 
 class MILPScheduler(BaseScheduler):
-    def __init__(self, scenario, time_limit=300, verbose=False):
+    def __init__(self, scenario, time_limit=300, verbose=False, plan_path=None):
+        if plan_path is not None and Path(plan_path).exists():  # cached plan -- skip re-solve
+            with open(plan_path, 'rb') as f:
+                plan = pickle.load(f)
+            self._T = plan['T']
+            self._building_nodes = plan['building_nodes']
+            self._fleet_plan = plan['fleet_plan']
+            return
+
         result = build_and_solve_extended(
             network=scenario['network'],
             vehicles_list=scenario['vehicles_list'],
@@ -22,7 +25,6 @@ class MILPScheduler(BaseScheduler):
             depot=scenario['depot'],
             demands_milp=scenario['demands_milp'],
             load_profile=scenario['load_profile'],
-            rc_params=scenario['rc_params'],
             T=scenario['T'],
             dt=scenario['dt'],
             E_cap=scenario['E_cap'],
@@ -32,8 +34,6 @@ class MILPScheduler(BaseScheduler):
             S_init=scenario['S_init'],
             Q_bldg=scenario['Q_bldg'],
             lam=scenario['lam'],
-            t_min=scenario['t_min'],
-            t_max=scenario['t_max'],
             time_limit=time_limit,
             verbose=verbose,
         )
@@ -48,16 +48,15 @@ class MILPScheduler(BaseScheduler):
 
         self._T = scenario['T']
         self._building_nodes = set(scenario['building_nodes'])
-        self._t_sp_min = {
-            b: scenario['rc_params'][b].get('t_sp_min', 16.0)
-            for b in scenario['building_nodes']
-        }
-        self._t_sp_max = {
-            b: scenario['rc_params'][b].get('t_sp_max', 30.0)
-            for b in scenario['building_nodes']
-        }
         self._fleet_plan = self._extract_fleet_plan(m, scenario)
-        self._building_plan = self._extract_building_plan(m, scenario)
+
+        if plan_path is not None:
+            with open(plan_path, 'wb') as f:
+                pickle.dump({
+                    'T': self._T,
+                    'building_nodes': self._building_nodes,
+                    'fleet_plan': self._fleet_plan,
+                }, f)
 
     def decide(self, state):
         t = state['t']
@@ -65,14 +64,7 @@ class MILPScheduler(BaseScheduler):
             self._fleet_plan.get((v['v_id'], t), {'arc': None, 'p': 0.0})
             for v in state['fleet']
         ]
-        buildings = {}
-        for b in state['buildings']:
-            b_id = b['b_id']
-            if b_id in self._building_nodes:
-                buildings[b_id] = self._building_plan.get(
-                    (b_id, t), self._t_sp_max.get(b_id, 30.0))
-            else:
-                buildings[b_id] = 24.0
+        buildings = {b['b_id']: None for b in state['buildings']}  # no thermal decision -- see README.md
         return {'fleet': fleet, 'buildings': buildings}
 
     def _extract_fleet_plan(self, m, scenario):
@@ -102,12 +94,4 @@ class MILPScheduler(BaseScheduler):
                     if departed is not None:
                         break
                 plan[(v, t)] = {'arc': departed, 'p': 0.0} if departed else {'arc': None, 'p': 0.0}
-        return plan
-
-    def _extract_building_plan(self, m, scenario):
-        plan = {}
-        for b in scenario['building_nodes']:
-            for t in range(scenario['T']):
-                on = pyo.value(m.z[b, t]) > 0.5
-                plan[(b, t)] = self._t_sp_min[b] if on else self._t_sp_max[b]
         return plan

@@ -1,13 +1,20 @@
 """
-A larger, real-data scenario: 6 real Chicago Community Areas (by trip
-volume), 30 vehicles, 317 real ride demands derived directly from the
-Chicago Taxi Trips CSV, plus a synthetic building load (no real building
-data is used here -- see scenarios/real_scenario.py for that).
+A larger, real-data scenario: real Chicago Community Areas (by trip
+volume), real ride demands derived directly from the Chicago Taxi Trips
+CSV, plus a synthetic building load (no real building data is used here
+-- see scenarios/small_scenario.py for that, which uses real BDG2 data
+instead). Not "more real" than small_scenario.py -- both use real Chicago
+taxi data; this one is bigger and its building load is synthetic instead
+of real BDG2.
 
-This is a bigger, slower-to-solve companion to real_scenario.py, used only
-by experiments/milp_comparison.py to show the MILP-vs-heuristic comparison
-at a scale where routing/scheduling is genuinely hard, not just a proof
-that the pipeline works.
+A bigger, slower-to-solve companion to small_scenario.py -- selectable in
+runner.py as the "chicago" scenario. At this scale routing/scheduling is
+genuinely hard, not just a proof that the pipeline works -- see the scale
+constants below (N_ACTIVE, V) and the comment on LAM for what's been
+checked to actually solve within a reasonable time at lambda=1.0 (a hard
+100% demand-service floor, kept fixed rather than relaxed). Null/
+HeuristicScheduler are unaffected by any of this -- they run against this
+scenario exactly like any other, no solver involved.
 
 Not a general-purpose loader -- data/loaders/ is for that. This is a
 fully-specified, one-time scenario construction tied to this exact
@@ -27,16 +34,31 @@ from simulator.building import BuildingClass, Building
 TAXI_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "chicago_taxi_trips.csv"
 TARGET_DATE = "2019-01-02"
 
-N_ACTIVE = 6            # top-6 Chicago community areas by trip volume
+N_ACTIVE = 4            # top-4 Chicago community areas by trip volume
 DEPOT = 0                # node 0 = highest-volume area = depot
 BUILDING_NODES = [1, 2]  # nodes 1, 2 = 2nd/3rd highest-volume areas
 T = 24                   # hourly resolution
 DT = 1.0
 
-# Smallest fleet size found (by increasing V until the routing MILP became
-# feasible at this network size) that can serve this scenario's demand at
-# all -- not re-derived on every run, just fixed once it was found.
-V = 30
+# lam=1.0 (serve every real demand) is kept fixed -- not relaxed, per an
+# explicit requirement that the demand-service floor stay a hard 100%, not
+# tuned down the way small_scenario.py's LAM=0.3 was. N_ACTIVE=6/V=30
+# (this scenario's original scale) checked directly: at lam=1.0, Gurobi
+# finds ZERO feasible solutions within 300s -- not just slow, genuinely
+# doesn't solve at that scale. Also checked: lowering lam alone doesn't
+# fix it either (lam=0.0, i.e. no demand constraint at all, still finds no
+# solution in 60s at N_ACTIVE=6/V=30) -- the bottleneck is the routing
+# formulation's combinatorial size (x[v,i,j,t] is V*N*N*T binaries), not
+# the demand floor.
+#
+# N_ACTIVE=4/V=13 is the scale actually used: checked directly across
+# V=10..20 at N_ACTIVE=4 -- V<=14 solves in under 20s (V=13: ~5s), V>=15
+# does not solve within 90s. V=13 keeps a full vehicle of margin below
+# that cliff. Still real Chicago Taxi Trips data (121 real demands from
+# 4 real community areas), still lam=1.0, just a smaller real network
+# than the original 6-area/30-vehicle version -- not a relaxed problem,
+# a smaller real one.
+V = 13
 
 E_CAP = 41.3
 EPS = 0.15
@@ -48,19 +70,14 @@ Q_BLDG = 200.0
 N_BAY = 5
 LAM = 1.0
 
-# RC thermal parameters -- placeholders, not fitted to any specific real
-# building's thermal behavior (this scenario doesn't use real building
-# data at all; see real_scenario.py for that).
-RC_A = 0.05
-RC_B = 0.02
-HVAC_MAX = 80.0
-T_INIT = 24.0
-T_MIN = 20.0   # flat comfort band -- occupancy isn't modeled in this repo
-T_MAX = 26.0
-
 
 def _synthetic_load(t):
-    """Synthetic daily load curve (placeholder, not real building data)."""
+    """
+    Synthetic daily load curve (placeholder, not real building data) --
+    the building's total electrical demand. Buildings are Mode A (see
+    build_scenario() below): no thermal decision, so there's no separate
+    HVAC component to net out of this figure.
+    """
     return 200.0 * math.sin(math.pi * t / 12) ** 2 + 50.0
 
 
@@ -190,14 +207,13 @@ def build_scenario():
     shared_load = {t: _synthetic_load(t) for t in range(T)}
     load_profile = {b: dict(shared_load) for b in BUILDING_NODES}  # same formula for both buildings here
     n_chargers = int(Q_BLDG / P_BAR)
-    rc_params = {
-        b: {'a': RC_A, 'b': RC_B, 'hvac_max': HVAC_MAX, 't_init': T_INIT}
-        for b in BUILDING_NODES
-    }
+    # Mode A (rc=None): AC setpoint is a constant for this paper's published
+    # checkpoint, not a decision any scheduler makes -- see
+    # scheduler/heuristic/__init__.py and scheduler/milp/__init__.py.
     buildings = BuildingClass([
         Building(
             b_id=b, load_profile=dict(load_profile[b]), n_chargers=n_chargers,
-            rc=dict(rc_params[b]),
+            rc=None,
         )
         for b in BUILDING_NODES
     ])
@@ -213,9 +229,6 @@ def build_scenario():
         'depot': DEPOT,
         'vehicles_list': list(range(V)),
         'load_profile': load_profile,
-        'rc_params': rc_params,
-        't_min': T_MIN,
-        't_max': T_MAX,
         'lam': LAM,
         'E_cap': E_CAP,
         'eps': EPS,
