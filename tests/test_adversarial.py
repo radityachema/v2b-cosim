@@ -5,6 +5,12 @@ available scenario, to confirm Vehicle.step()/Building.step() clamp to
 physically valid values no matter what a scheduler sends -- not just under
 well-behaved heuristics, one lucky seed, or one scenario's topology. Plain
 asserts, no test framework, matching tests/test_heuristic.py's style.
+
+Also confirms Vehicle.step() rejects an arc that doesn't start from the
+vehicle's actual current node (a real gap found in review: nothing enforced
+this before -- a parked vehicle handed an unrelated arc would silently
+teleport and pay that arc's energy cost). Fixed in simulator/fleet.py;
+covered here so it can't regress silently.
 """
 import copy
 import random
@@ -85,8 +91,8 @@ class OscillatingScheduler(BaseScheduler):
 class AlwaysTeleportScheduler(BaseScheduler):
     """Every idle vehicle, every timestep, is routed onto an arc chosen
     without any regard for its current node -- always, not the 30% hit rate
-    RandomFuzzScheduler gets by chance. Stress-tests the undefended arc/
-    current-node adjacency gap under sustained abuse."""
+    RandomFuzzScheduler gets by chance. Stress-tests arc/current-node
+    adjacency rejection under sustained abuse (see Vehicle.step())."""
 
     def __init__(self, seed):
         self.rng = random.Random(seed)
@@ -179,12 +185,11 @@ if __name__ == '__main__':
         f"expected p reset to 0 when arc decision taken, got {sim2.fleet.vehicles[0].p}"
     print("PASS: contradictory decision (arc + huge p) -- arc wins, p silently ignored, not summed")
 
-    # Documented non-invariant, not a bug: arc/current-node adjacency isn't
-    # validated by Vehicle.step() -- routing correctness is the Scheduler's
-    # responsibility, the Simulator just applies whatever arc it's
-    # given. A vehicle at the depot handed arc ('A','B') -- which it was
-    # never physically on -- teleports straight to 'B' and pays that arc's
-    # energy cost, no adjacency check anywhere in the physics layer.
+    # Arc/current-node adjacency IS validated by Vehicle.step() (fixed in
+    # review -- previously it wasn't). A vehicle at the depot handed arc
+    # ('A','B') -- which it was never physically on -- must NOT teleport to
+    # 'B'; the arc gets clamped to "no decision" (same as any other
+    # physically-impossible value) and the vehicle stays exactly where it is.
     scenario = _toy()
     sim3 = Simulator(scenario['network'], scenario['ride_demand'],
                       scenario['fleet'], scenario['buildings'], dt=scenario['dt'])
@@ -193,8 +198,34 @@ if __name__ == '__main__':
         'fleet': [{'arc': ('A', 'B'), 'p': 0.0}] + [{'arc': None, 'p': 0.0} for _ in sim3.fleet.vehicles[1:]],
         'buildings': {b.b_id: None for b in sim3.buildings.buildings},
     })
-    assert sim3.fleet.vehicles[0].node == 'B' and sim3.fleet.vehicles[0].arc is None, \
-        "expected an unvalidated ('A','B') arc from the depot to teleport the vehicle straight to 'B'"
-    print("PASS: confirmed (documented, not a bug) -- arc/current-node adjacency is not validated by the physics layer")
+    assert sim3.fleet.vehicles[0].node == scenario['network'].depot and sim3.fleet.vehicles[0].arc is None, \
+        "expected an ('A','B') arc from the depot (a node the vehicle was never on) to be rejected, not teleport it"
+    print("PASS: arc from a node the vehicle isn't on is rejected, vehicle stays put")
+
+    # Same check, but the vehicle IS mid-transit -- confirm a mismatched arc
+    # sent while already traveling doesn't get picked up either (it's ignored
+    # entirely while self.arc is not None, this just confirms that stays true).
+    # Needs tau >= 3: departure consumes one step (arc_remaining tau -> tau-1),
+    # so tau=2 would already arrive on the very next step, leaving no
+    # still-mid-transit step to test the mismatched-arc-is-ignored behavior.
+    scenario = _toy()
+    sim4 = Simulator(scenario['network'], scenario['ride_demand'],
+                      scenario['fleet'], scenario['buildings'], dt=scenario['dt'])
+    arcs4 = list(sim4.network.arcs.keys())
+    valid_arc = next(a for a in arcs4
+                      if a[0] == sim4.fleet.vehicles[0].node and sim4.network.get_arc(*a)['tau'] >= 3)
+    sim4.step({
+        'fleet': [{'arc': valid_arc, 'p': 0.0}] + [{'arc': None, 'p': 0.0} for _ in sim4.fleet.vehicles[1:]],
+        'buildings': {b.b_id: None for b in sim4.buildings.buildings},
+    })
+    assert sim4.fleet.vehicles[0].arc == valid_arc, "expected the valid arc to be accepted and still in progress"
+    unrelated_arc = next(a for a in arcs4 if a != valid_arc)
+    sim4.step({
+        'fleet': [{'arc': unrelated_arc, 'p': 0.0}] + [{'arc': None, 'p': 0.0} for _ in sim4.fleet.vehicles[1:]],
+        'buildings': {b.b_id: None for b in sim4.buildings.buildings},
+    })
+    assert sim4.fleet.vehicles[0].arc == valid_arc, \
+        "expected an arc sent mid-transit to be ignored -- vehicle should still be on its original arc"
+    print("PASS: an arc sent while a vehicle is mid-transit is ignored, original arc continues")
 
     print("\nAll adversarial checks passed.")

@@ -37,6 +37,10 @@ class Vehicle:
             self.p = 0.0
         else:
             new_arc = decision.get('arc')
+            if new_arc is not None and new_arc[0] != self.node:
+                new_arc = None  # scheduler issued an arc not starting from this vehicle's actual
+                                 # node -- physically impossible, clamp to "no decision" same as
+                                 # any other hardware limit (see p_max/SoC clamping below)
             if new_arc is not None:
                 arc_info = network.get_arc(*new_arc)
                 self.node = None
