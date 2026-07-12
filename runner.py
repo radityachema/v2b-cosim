@@ -11,11 +11,15 @@ from scenarios.chicago_scenario import build_scenario as build_chicago_scenario
 from evaluation import metrics
 from evaluation.plotting import plot_triple_panel, plot_comparison, summarize_fleet
 
-# both use real Chicago Taxi data; only 'chicago' also uses real BDG2 building load.
-# difference is scale/solve-time -- see chicago_scenario.py.
+# both use real Chicago Taxi data + real DOE/EnergyPlus Chicago-O'Hare building
+# load. 'small' is the largest scale that still solves the MILP to PROVEN
+# optimality (39s). 'chicago' is the full ~77-node city scale -- MILP doesn't
+# solve there (confirmed: N=5,V=20 already plateaus at a flat 5.53% gap even
+# after 12h), so it's a Heuristic/Null-only scenario. See both scenario files'
+# docstrings.
 SCENARIOS = {
-    'small': (build_small_scenario, "5 vehicles, 3 nodes -- fast, seconds to solve"),
-    'chicago': (build_chicago_scenario, "larger real Chicago-scale network -- see chicago_scenario.py for current size/solve-time notes"),
+    'small': (build_small_scenario, "13 vehicles, 4 nodes -- MILP solves to proven optimal in ~39s"),
+    'chicago': (build_chicago_scenario, "250 vehicles, 77 nodes (full city scale) -- Heuristic/Null only, MILP does not solve here"),
 }
 
 SCHEDULERS = {
@@ -80,6 +84,7 @@ def run(scenario, scheduler, label):
     all_demands = list(scenario['ride_demand'].demands)
     served = [d for d in all_demands if d['id'] in served_ids]
     rho = metrics.demand_fulfillment(served, all_demands, scenario['network']) if all_demands else 1.0
+    e_discharged = metrics.total_energy_discharged(p_hist, scenario['dt'])
 
     print(f"\n--- {label} ---")
     for b_id in building_ids:
@@ -88,7 +93,8 @@ def run(scenario, scheduler, label):
         phi = metrics.temporal_alignment(p_v2b_hist[b_id], p_load_hist[b_id])
         print(f"  Building {b_id}: peak_reduction={dp:.2f} kW, "
               f"v2b_utilization={eta:.2%}, temporal_alignment={phi:.3f}")
-    print(f"  Fleet: demand_fulfillment (rho) = {rho:.2%} ({len(served)}/{len(all_demands)})")
+    print(f"  Fleet: demand_fulfillment (rho) = {rho:.2%} ({len(served)}/{len(all_demands)}), "
+          f"total_energy_discharged = {e_discharged:.2f} kWh")
 
     return {
         'p_load_hist': p_load_hist, 'p_grid_hist': p_grid_hist,

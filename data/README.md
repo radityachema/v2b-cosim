@@ -4,48 +4,65 @@ Raw data is not committed (see `.gitignore`). Download and place files at
 the paths below before running `runner.py` — it reads from these fixed
 locations, for either the `small` or `chicago` scenario.
 
+Both `scenarios/small_scenario.py` and `scenarios/chicago_scenario.py` do
+their own inline pandas processing of the raw taxi CSV rather than going
+through a shared loader (each needs its own top-N-areas-by-volume /
+centroid / haversine logic, which isn't reusable across a fixed node count).
+`data/loaders/fleet.py` and `data/loaders/building.py` (the BDG2 loader) are
+therefore currently unused by both scenarios -- left in place, not deleted,
+in case a future scenario wants a simpler non-bespoke loader again.
+
 ## Fleet data — Chicago Taxi Trips
 
 Source: [Chicago Data Portal](https://data.cityofchicago.org/Transportation/Taxi-Trips/wrvz-psew)
 
 Download the CSV export and save it as `data/chicago_taxi_trips.csv`.
 
-Loader: `data/loaders/fleet.py → load_chicago_taxi_demands(path, date, node_map)`
+## Building data — DOE Commercial Reference Buildings (used by both scenarios)
 
-Returns a list of ride demand dicts (`{'id', 'i_d', 'j_d', 't_d'}`) ready for
-`RideDemandClass`, at native hourly resolution. `node_map` (Chicago Community
-Area → network node id) is supplied by the caller — this loader doesn't decide
-which areas belong in a given network, so it stays reusable across setups.
+Source: [OpenEI, dataset 961](https://openei.org/datasets/files/961/pub/COMMERCIAL_LOAD_DATA_E_PLUS_OUTPUT/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3/)
+— EnergyPlus-simulated (not measured), ASHRAE 90.1-2004 DOE Commercial
+Reference Building prototypes, Chicago-O'Hare TMY3 weather file. Citation:
+M. Deru et al., "U.S. Department of Energy Commercial Reference Building
+Models of the National Building Stock," NREL/TP-5500-46861, 2011. Native
+resolution is hourly, one year (8760 rows) per building type. This is a
+genuinely Chicago-located dataset — unlike BDG2 above, no city mismatch.
 
-## Building data — Building Data Genome Project 2 (BDG2)
+Illinois has 17 TMY3 stations; only two are within Chicago city limits
+(O'Hare 725300, Midway 725340) — the rest (DuPage, Waukegan, etc.) are
+suburban. We use O'Hare. Each station has the same 16 DOE reference building
+types (offices, hotels, retail, school, hospital, etc.) — see the directory
+link above for the full list.
 
-Source: [https://github.com/buds-lab/building-data-genome-project-2](https://github.com/buds-lab/building-data-genome-project-2)
+Download `RefBldgMediumOfficeNew2004_v1.3_7.1_5A_USA_IL_CHICAGO-OHARE.csv`
+and `RefBldgSmallHotelNew2004_v1.3_7.1_5A_USA_IL_CHICAGO-OHARE.csv`, save as
+`data/doe_chicago/MediumOffice.csv` and `data/doe_chicago/SmallHotel.csv`.
 
-Download `electricity_cleaned.csv` (meter readings) and `weather.csv`, save
-both under `data/bdg2/`.
-
-Loader: `data/loaders/building.py → load_bdg2_load(path, building_id, date)`,
-`load_bdg2_weather(path, site_id, date)`
-
-Both return plain dicts (`{t: value}`, `t` = hour of day 0–23) — `load_bdg2_load`
-in kW for one building column, `load_bdg2_weather` in °C outdoor temperature for
-one site.
-
-**No BDG2 site is actually located in Chicago** (checked directly — closest
-`US_Central` timezone sites are Austin, TX and Minneapolis, MN). Pairing
-Chicago fleet demand with a BDG2 building means a real-but-different-city
-building, not a geographically coherent deployment — fine for testing the
-pipeline end-to-end, not for claiming a coherent scenario without saying so.
-`scenarios/small_scenario.py` uses the "Panther" site (Orlando, FL) for this
-reason among others — it's simply a real building whose meter data was
-available, not a claim about Chicago building stock.
+Loader: `data/loaders/doe_chicago.py → load_doe_chicago_load(path, month, day)`.
+Returns `{15-min timestep index (0-95): kW}`, linearly interpolated from the
+native hourly data (see the loader's docstring for the EnergyPlus hour-24
+timestamp convention). MediumOffice (node 1) and SmallHotel (node 2) are used
+by both scenarios; the "commensurate with fleet power capacity" pick was
+calibrated against `small_scenario.py`'s V=13 (`V * P_bar` = 130 kW):
+MediumOffice peaks ~319 kW, SmallHotel ~136 kW. At `chicago_scenario.py`'s
+V=250, the same two buildings are comparatively small relative to total fleet
+capacity (2,500 kW) — the binding constraint there is `Q_bldg` (fixed
+charger count, 200 kW / 20 chargers, unchanged from small_scenario.py, since
+a real building's charger count doesn't scale with the city's total fleet
+size), not building-vs-fleet power matching. (LargeOffice peaks ~1658 kW,
+SmallOffice ~20 kW — both were tried and rejected as poor fits at V=13.)
 
 ## Shared clock
 
-Both loaders operate at native hourly resolution (`t` = hour of day) — that's
-the real granularity of both source datasets, not resampled to 15-min. Build
-the `Simulator` for real-data runs with `dt=1.0`, not the synthetic toy
-scenario's default `dt=0.25`.
+Both scenarios now run at `T=96`, `dt=0.25` (15-min) — the DOE building load
+is native hourly but interpolated to this resolution in both, and the
+ride-demand pickup times are genuinely 15-min (derived from the taxi trips'
+real timestamps) in both. They differ only in scale: `small_scenario.py` is
+4 nodes / 13 vehicles (the largest scale that still solves the MILP to
+proven optimality, 39s); `chicago_scenario.py` is the full 77 real active
+Chicago community areas / 250 vehicles (Heuristic/Null only — MILP does not
+solve at this scale, see `scenarios/chicago_scenario.py`'s docstring for the
+stress-test evidence).
 
 ## No thermal (Mode B) decision in the published scenarios
 

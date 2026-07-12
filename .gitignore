@@ -5,5 +5,18 @@ __pycache__/
 .env
 data/chicago_taxi_trips.csv
 data/bdg2/
+data/doe_chicago/
 outputs/
 data/*.pkl
+
+# Paper folder -- not part of the code repo, not tracked at all
+paper/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.synctex.gz

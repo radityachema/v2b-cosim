@@ -23,6 +23,14 @@ def temporal_alignment(p_v2b_history, p_load_history):
     return statistics.correlation(p_v2b_history, p_load_history)
 
 
+def total_energy_discharged(p_hist, dt):
+    """Total V2B energy discharged by the fleet across the whole horizon (kWh) --
+    real per-vehicle battery discharge, summed over all vehicles and timesteps.
+    Complements peak_reduction, which only scores a single instant and can miss
+    a scheduler's V2B activity entirely if it doesn't land on the exact peak."""
+    return sum(max(0.0, -p) for v_hist in p_hist.values() for p in v_hist) * dt
+
+
 def demand_fulfillment(served_demands, all_demands, network):
     """Rho: distance-weighted fraction of ride-hailing demand served [0, 1].
 

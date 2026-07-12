@@ -68,21 +68,21 @@ scheduler/
 runner.py           plug-and-play demo -- pick a scenario ("small" or "chicago"), a scheduler (or "all"), optionally plot
 tests/test_heuristic.py  non-interactive correctness check (asserts, no test framework)
 data/loaders/
-  fleet.py         load_chicago_taxi_demands() -- real ride demands for RideDemandClass
-  building.py      load_bdg2_load(), load_bdg2_weather() -- real building load + outdoor temp
+  doe_chicago.py   load_doe_chicago_load() -- real DOE/EnergyPlus Chicago-O'Hare building load
+  fleet.py, building.py  unused by current scenarios -- see data/README.md
 evaluation/
-  metrics.py       ΔP, η_v2b, φ_i, ρ -- plain Python, no pandas dependency
+  metrics.py       ΔP, η_v2b, φ_i, ρ, total energy discharged -- plain Python, no pandas dependency
   plotting.py      single-run triple panel, multi-scheduler-overlay plot, fleet text summary
 scenarios/
   toy_scenario.py      3 vehicles, 2 buildings, no external files -- used by tests/ only
-  small_scenario.py    Real Chicago Taxi ride demand + real BDG2 building load/weather -- the road
-                       network between nodes is a placeholder, not real travel data (see comment in
-                       the file). runner.py's "small" scenario (5 vehicles, 3 nodes). Carries every
-                       field any scheduler needs (Null, Heuristic, or MILP), so all three run
-                       against genuinely identical data -- no separate scenario per scheduler.
-  chicago_scenario.py  4 real Chicago community areas, 13 vehicles, 121 real demands -- runner.py's
-                       "chicago" scenario (synthetic building load; see Quick Start for why this
-                       size was chosen).
+  small_scenario.py    Real Chicago Taxi ride demand + real DOE/EnergyPlus building load. 4 nodes,
+                       13 vehicles -- the largest scale that still solves the MILP to PROVEN
+                       optimality (39s). Carries every field any scheduler needs (Null, Heuristic,
+                       or MILP), so all three run against genuinely identical data.
+  chicago_scenario.py  Full city scale: all 77 real Chicago community areas with taxi activity on
+                       the target date, 250 vehicles. Same data sources as small_scenario.py, just
+                       the real N/V instead of a curated subset. MILP does not solve here -- see
+                       Quick Start below -- Heuristic/Null only.
 docs/Architecture.png  system diagram
 ```
 
@@ -96,9 +96,9 @@ Dependencies: `pip install -r requirements.txt` (pandas, numpy, matplotlib, pyom
 python runner.py
 ```
 
-Prompts for a scenario (`small`: 5 vehicles, 3 nodes, seconds to solve; `chicago`: 13 vehicles, 4 real Chicago community areas, 121 real demands, harder but still solves in ~5s), then a scheduler (`null`, `heuristic`, `milp`, or `all`), then whether to save a plot, then prints ΔP, η_v2b, φ_i, ρ for each. Pick `all` to run every scheduler against the identical scenario and get one comparison plot — the same building load curve with each scheduler's grid draw overlaid on it, so it's a genuine apples-to-apples comparison, not separate experiments.
+Prompts for a scenario (`small`: 4 nodes, 13 vehicles, MILP solves to proven optimal in ~39s; `chicago`: full city scale, 77 nodes, 250 vehicles, 3168 real demands -- Heuristic/Null only), then a scheduler (`null`, `heuristic`, `milp`, or `all`), then whether to save a plot, then prints ΔP, η_v2b, φ_i, ρ, and total energy discharged for each. Pick `all` to run every scheduler against the identical scenario and get one comparison plot — the same building load curve with each scheduler's grid draw overlaid on it, so it's a genuine apples-to-apples comparison, not separate experiments.
 
-`MILPScheduler` solves in seconds against either scenario — it's a real, satisfied instance of the `BaseScheduler` contract, not a special case requiring different data. `chicago` keeps `lambda=1.0` (100% demand-service floor) fixed; `small` uses `lambda=0.3`, the largest value that solves there (see Status below). `chicago_scenario.py` was originally 6 areas / 30 vehicles / 317 demands; checked directly that this does **not** solve within Gurobi's default time limit even at `lambda=0.0` (no demand constraint at all) -- the bottleneck is the routing formulation's combinatorial size, not the demand floor. The scenario now used is a smaller real network (4 areas / 13 vehicles / 121 real demands) found by testing V=10..20 directly: V≤14 solves in under 20s, V≥15 doesn't solve within 90s. `Null`/`HeuristicScheduler` run against either scenario the same way, no solver involved.
+**MILP scale is a confirmed hard wall, not a "didn't try hard enough" gap.** A stress-frontier sweep (varying node count and fleet size, each point given up to 12h) found: `small_scenario.py`'s N=4/V=13 solves to proven optimality in 39s; the very next step up, N=5/V=20, plateaus at a flat 5.53% optimality gap -- identical objective and bound whether given 6h or 12h, i.e. the search genuinely stalls, not just closes slowly. `chicago_scenario.py` (N=77/V=250) is far beyond that wall and is not expected to solve with this exact MILP formulation; it exists to demonstrate that the Simulator/Scheduler architecture itself -- not just the MILP scheduler -- handles real city-scale complexity (confirmed: Heuristic runs the full scenario in ~0.1s wall time). A scalable optimizer (rolling horizon, decomposition) would be new scope, not attempted here. `Null`/`HeuristicScheduler` run against either scenario the same way, no solver involved.
 
 For a fast, dependency-free correctness check instead of exploration (no data files or Gurobi needed):
 
@@ -124,6 +124,8 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-`runner.py` is the plug-and-play demo: `NullScheduler`, `HeuristicScheduler`, and `MILPScheduler` all run against either scenario, verified end-to-end, all three computing peak reduction, V2B utilization, and temporal alignment. Against `small`, MILP uses `λ=0.3` (see below). Against `chicago`, MILP keeps a hard `λ=1.0` (100% demand service) and gets it: 100% demand fulfillment, positive peak reduction on both buildings, strong temporal alignment (checked directly: 0.735 / 0.685) — solved in ~5s.
+`runner.py` is the plug-and-play demo: `NullScheduler`, `HeuristicScheduler`, and `MILPScheduler` all run against `small` (4 nodes, 13 vehicles), verified end-to-end. `chicago` (77 nodes, 250 vehicles) runs `Null`/`HeuristicScheduler` only -- MILP does not solve at that scale (see Quick Start above). Both scenarios keep a hard `λ=1.0` (100% demand-service floor), no asymmetry between them.
 
-Two structural asymmetries are worth remembering when reading a Heuristic-vs-MILP comparison: the MILP has full-day foresight the heuristic doesn't have, and (for `small`) a demand-service floor the heuristic has no equivalent of (checked directly: `λ=1.0`, i.e. serve every demand, is infeasible for the 5-vehicle `small` scenario — `λ=0.3` is the largest value that solves there; `chicago`'s smaller real network solves at the full `λ=1.0`). So report peak reduction *and* demand fulfillment together, never peak reduction alone.
+Against `small`: MILP gets 100% demand fulfillment, positive peak reduction on both buildings (25.43 kW / 2.26 kW), positive temporal alignment (0.408 / 0.098). Heuristic gets 74.94% demand fulfillment, 0.00 kW peak reduction on both buildings (see `scheduler/heuristic/README.md` -- this is expected, not a bug: peak reduction is a single-instant metric and Heuristic has no foresight of exactly when the peak lands), negative temporal alignment on both (-0.230 / -0.444), but discharges far more total energy overall (1,127.5 kWh vs. MILP's 193.2 kWh) -- report peak reduction, demand fulfillment, *and* total energy discharged together, never any one alone.
+
+Against `chicago` (Heuristic only, real city scale): 38.50% demand fulfillment (1,438/3,168 real demands), 10.00 kW peak reduction on building 1, 29,987.5 kWh total energy discharged. The structural asymmetry worth remembering for any future Heuristic-vs-MILP comparison: the MILP has full-day foresight the heuristic doesn't have.

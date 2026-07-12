@@ -1,6 +1,13 @@
-"""Larger real-Chicago-demand scenario with synthetic building load; harder
-routing/scheduling instance than small_scenario.py. Not a general-purpose
-loader -- see data/loaders/ for that."""
+"""Full city-scale Chicago scenario: all 77 real community areas with taxi
+activity on the target date, 250 vehicles. This is what "the simulator scales
+to realistic complexity" actually means -- NetworkClass/RideDemandClass/
+FleetClass/BuildingClass have no dependency on small N; only the exact MILP
+scheduler does. Confirmed via a stress-frontier sweep: N=4,V=13 solves to
+proven optimality in 39s, N=5,V=20 plateaus at a flat 5.53% gap even after
+12h (identical bound at 6h and 12h -- a genuine combinatorial wall, not a
+patience problem). MILP is not expected to run here at all; use Heuristic or
+Null. See small_scenario.py for the MILP-provable-optimal companion scenario.
+Not a general-purpose loader -- see data/loaders/ for that."""
 import math
 from pathlib import Path
 
@@ -10,20 +17,30 @@ from simulator.network import NetworkClass
 from simulator.ride_demand import RideDemandClass
 from simulator.fleet import FleetClass, Vehicle
 from simulator.building import BuildingClass, Building
+from data.loaders.doe_chicago import load_doe_chicago_load
 
-# See data/README.md for where to get this file.
+# See data/README.md for where to get these files.
 TAXI_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "chicago_taxi_trips.csv"
 TARGET_DATE = "2019-01-02"
+DOE_CHICAGO_DIR = Path(__file__).resolve().parent.parent / "data" / "doe_chicago"
+DOE_MONTH, DOE_DAY = 1, 2  # TMY3 is a synthetic typical year, not tied to a real
+                           # calendar year -- day-of-year chosen to match TARGET_DATE
 
-N_ACTIVE = 4            # top-4 Chicago community areas by trip volume
+# 77 is not an arbitrary round number -- it's the actual count of distinct
+# Chicago community areas with real pickup/dropoff activity on TARGET_DATE
+# (verified directly against the raw data), i.e. every active area, not a
+# curated subset.
+N_ACTIVE = 77
 DEPOT = 0                # node 0 = highest-volume area = depot
-BUILDING_NODES = [1, 2]  # nodes 1, 2 = 2nd/3rd highest-volume areas
-T = 24                   # hourly resolution
-DT = 1.0
+BUILDING_NODES = [1, 2]  # nodes 1, 2 = 2nd/3rd highest-volume areas; 1=MediumOffice, 2=SmallHotel
+T = 96                   # 15-min resolution (hourly DOE data linearly interpolated -- see
+                         # data/loaders/doe_chicago.py)
+DT = 0.25
 
-# lam=1.0 (100% demand-service) kept fixed -- not relaxed. V=13, N_ACTIVE=4 is the
-# largest scale found to solve reliably within the time budget at that floor.
-V = 13
+# V/N_ACTIVE kept at the same ~3.25 ratio as small_scenario.py's V=13/N=4.
+# lam=1.0 (100% demand-service) kept fixed for consistency with
+# small_scenario.py, even though only Heuristic/Null are expected to run here.
+V = 250
 
 E_CAP = 41.3
 EPS = 0.15
@@ -33,11 +50,6 @@ S_MAX = 0.9
 S_INIT = 0.8
 Q_BLDG = 200.0
 LAM = 1.0
-
-
-def _synthetic_load(t):
-    """Synthetic daily load curve, placeholder for real building data."""
-    return 200.0 * math.sin(math.pi * t / 12) ** 2 + 50.0
 
 
 def _haversine_miles_and_tau(lon1, lat1, lon2, lat2):
@@ -51,13 +63,16 @@ def _haversine_miles_and_tau(lon1, lat1, lon2, lat2):
     # `EPS` (energy per mile) is calibrated against that unit, so converting
     # this to actual km later would silently break the SoC-consumption math.
     dist_miles = round(km * 0.621371, 2)
-    tau = max(1, min(math.ceil(km / 40), T - 2))
+    # km/40 is hours at an assumed 40 km/h; divide by DT to convert hours ->
+    # timesteps (only equivalent to the raw hour count when DT=1.0).
+    tau = max(1, min(math.ceil((km / 40) / DT), T - 2))
     return dist_miles, tau
 
 
 def build_scenario():
     """Builds the scenario dict, including MILP-specific fields sharing this same
-    network/fleet/demand data."""
+    network/fleet/demand data (MILP fields are present for interface consistency
+    with small_scenario.py, not because MILP is expected to solve this scale)."""
     df = pd.read_csv(TAXI_CSV_PATH, low_memory=False)
     df['Trip Start Timestamp'] = pd.to_datetime(df['Trip Start Timestamp'])
     day = df[df['Trip Start Timestamp'].dt.date == pd.Timestamp(TARGET_DATE).date()].copy()
@@ -107,7 +122,10 @@ def build_scenario():
     trips = day[valid].copy()
     trips['on'] = trips['on'].astype(int)
     trips['dn'] = trips['dn'].astype(int)
-    trips['th'] = trips['Trip Start Timestamp'].dt.hour
+    # 15-min-slot index (0-95), not just the hour -- T is now 96, so an
+    # hour-only index would cram every demand into the first 24 slots.
+    trips['th'] = (trips['Trip Start Timestamp'].dt.hour * 4
+                    + trips['Trip Start Timestamp'].dt.minute // 15)
 
     # Dedup by (origin, dest, hour), first occurrence in row order --
     # fully deterministic, no randomness involved.
@@ -159,8 +177,18 @@ def build_scenario():
         for i in range(V)
     ])
 
-    shared_load = {t: _synthetic_load(t) for t in range(T)}
-    load_profile = {b: dict(shared_load) for b in BUILDING_NODES}
+    # node 1 = MediumOffice, node 2 = SmallHotel -- two distinct DOE reference
+    # building types, both from the Chicago-O'Hare TMY3 station. Q_bldg/n_chargers
+    # is unchanged from small_scenario.py -- a real building's charger count
+    # doesn't scale with the city's total fleet size, so at V=250 this is a
+    # genuinely binding constraint (unlike at V=13, where V*P_bar < Q_bldg made
+    # it decorative). Only Heuristic/Null are expected to run this scenario --
+    # see module docstring.
+    doe_file_by_node = {1: 'MediumOffice.csv', 2: 'SmallHotel.csv'}
+    load_profile = {
+        b: load_doe_chicago_load(DOE_CHICAGO_DIR / doe_file_by_node[b], DOE_MONTH, DOE_DAY)
+        for b in BUILDING_NODES
+    }
     n_chargers = int(Q_BLDG / P_BAR)
     buildings = BuildingClass([
         Building(
