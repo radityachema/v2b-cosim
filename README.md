@@ -19,7 +19,7 @@ Each scheduler's math lives next to its implementation: [scheduler/heuristic/REA
 
 **Scheduler** — pluggable decision-maker: anything implementing `decide(state) -> {'fleet': [...], 'buildings': {...}}`. One call in, one call out, per timestep — no round-trip between fleet and building decisions within a step.
 
-**Evaluation** (`evaluation/metrics.py`): peak reduction ΔP (kW), demand fulfillment ρ (%), V2B utilization η_v2b (%), temporal alignment φ_i (correlation), total energy discharged (kWh). `evaluation/plotting.py` renders per-run and multi-scheduler comparison plots.
+**Evaluation** (`evaluation/metrics.py`): peak reduction ΔP (kW), demand fulfillment ρ (%), V2B utilization η_v2b (%), temporal alignment φ_i (correlation), total energy discharged (kWh), SoC conservation error (kWh — net fleet depletion vs. initial charge by end of horizon). `evaluation/plotting.py` renders per-run and multi-scheduler comparison plots.
 
 ## Repo layout
 
@@ -82,8 +82,10 @@ class MyScheduler(BaseScheduler):
 
 `NullScheduler`, `HeuristicScheduler`, `MILPScheduler` all run against `small`. `chicago` runs `Null`/`HeuristicScheduler` only — MILP doesn't scale there. Both use λ=1.0 (100% demand-service floor).
 
-| Scenario | Scheduler | ρ | ΔP (kW) | Energy discharged |
-|---|---|---|---|---|
-| small | MILP | 100% | 25.43 / 2.26 | 193.2 kWh |
-| small | Heuristic | 74.94% | 0.00 / 0.00 | 1,127.5 kWh |
-| chicago | Heuristic | 38.50% | 10.00 / 0.00 | 29,987.5 kWh |
+| Scenario | Scheduler | ρ | ΔP (kW) | Energy discharged | SoC conservation error |
+|---|---|---|---|---|---|
+| small | MILP | 100% | 25.43 / 2.26 | 193.2 kWh | −14.3 kWh |
+| small | Heuristic | 74.94% | 0.00 / 0.00 | 1,127.5 kWh | +317.0 kWh |
+| chicago | Heuristic | 38.50% | 10.00 / 0.00 | 29,987.5 kWh | +5,761.6 kWh |
+
+MILP's SoC error is ~0 by construction (a hard constraint enforces ending at or above the initial charge); Heuristic has no such guarantee. ~28% of Heuristic's headline energy-discharged figure on `small` is unrecovered net depletion, not sustainable day-over-day cycling — same story proportionally at city scale.

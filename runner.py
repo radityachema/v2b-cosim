@@ -85,6 +85,7 @@ def run(scenario, scheduler, label):
     served = [d for d in all_demands if d['id'] in served_ids]
     rho = metrics.demand_fulfillment(served, all_demands, scenario['network']) if all_demands else 1.0
     e_discharged = metrics.total_energy_discharged(p_hist, scenario['dt'])
+    soc_err = metrics.soc_conservation_error(soc_hist, scenario['S_init'], scenario['E_cap'])
 
     print(f"\n--- {label} ---")
     for b_id in building_ids:
@@ -94,7 +95,8 @@ def run(scenario, scheduler, label):
         print(f"  Building {b_id}: peak_reduction={dp:.2f} kW, "
               f"v2b_utilization={eta:.2%}, temporal_alignment={phi:.3f}")
     print(f"  Fleet: demand_fulfillment (rho) = {rho:.2%} ({len(served)}/{len(all_demands)}), "
-          f"total_energy_discharged = {e_discharged:.2f} kWh")
+          f"total_energy_discharged = {e_discharged:.2f} kWh, "
+          f"soc_conservation_error = {soc_err:+.2f} kWh")
 
     return {
         'p_load_hist': p_load_hist, 'p_grid_hist': p_grid_hist,
