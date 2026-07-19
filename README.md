@@ -84,8 +84,8 @@ class MyScheduler(BaseScheduler):
 
 | Scenario | Scheduler | ρ | ΔP (kW) | Energy discharged | SoC conservation error |
 |---|---|---|---|---|---|
-| small | MILP | 100% | 25.43 / 2.26 | 193.2 kWh | −14.3 kWh |
-| small | Heuristic | 74.94% | 0.00 / 0.00 | 1,127.5 kWh | +317.0 kWh |
-| chicago | Heuristic | 38.50% | 10.00 / 0.00 | 29,987.5 kWh | +5,761.6 kWh |
+| small | MILP | 100% | 25.43 / 2.26 | 193.2 kWh | +14.3 kWh |
+| small | Heuristic | 74.94% | 0.00 / 0.00 | 1,127.5 kWh | −317.0 kWh |
+| chicago | Heuristic | 38.50% | 10.00 / 0.00 | 29,987.5 kWh | −5,761.6 kWh |
 
-MILP's SoC error is ~0 by construction (a hard constraint enforces ending at or above the initial charge); Heuristic has no such guarantee. ~28% of Heuristic's headline energy-discharged figure on `small` is unrecovered net depletion, not sustainable day-over-day cycling — same story proportionally at city scale.
+SoC conservation error: negative = fleet ends the day below its initial charge, positive = ends above. MILP's is ~0 by construction (a hard constraint enforces ending at or above the initial charge); Heuristic has no such guarantee. ~28% of Heuristic's headline energy-discharged figure on `small` is unrecovered net depletion, not sustainable day-over-day cycling — same story proportionally at city scale.

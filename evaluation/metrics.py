@@ -33,12 +33,12 @@ def total_energy_discharged(p_hist, dt):
 
 def soc_conservation_error(soc_hist, s_init, e_cap):
     """Fleet-wide net SoC deviation from initial, at the end of the horizon (kWh).
-    Positive = net depleted (fleet ends below where it started); negative = net
+    Negative = net depleted (fleet ends below where it started); positive = net
     surplus. MILP's c_soc_term constraint enforces S[v,T] >= S_init directly,
     so this is ~0 there by construction; Heuristic/Null have no such guarantee
     -- this exposes whether a scheduler's high total_energy_discharged is being
     paid for by ending the day at a lower charge, not free."""
-    return sum((s_init - hist[-1]) * e_cap for hist in soc_hist.values())
+    return sum((hist[-1] - s_init) * e_cap for hist in soc_hist.values())
 
 
 def demand_fulfillment(served_demands, all_demands, network):
