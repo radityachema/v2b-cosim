@@ -36,21 +36,20 @@ if __name__ == '__main__':
         f"expected exactly 1 vehicle serving demand at t=10, got {demand_arc_count_at_t10}"
     print("PASS: seeded demand served exactly once at t=10 (dedup confirmed)")
 
-    # HeuristicScheduler makes no thermal decision -- AC setpoint is a
-    # constant (None) for this paper's published checkpoint, not something
-    # any scheduler decides. Confirm that directly rather than just via its
-    # downstream effect.
-    assert all(t_sp is None for t_sp in decisions['buildings'].values()), \
-        f"expected every building decision to be None (no thermal decision), got {decisions['buildings']}"
-    print("PASS: HeuristicScheduler makes no building thermal decision")
+    # HeuristicScheduler returns a fixed comfort setpoint (T_SP_FIXED) for
+    # every building -- constant, not decided per-timestep, but no longer
+    # None: Mode B buildings' bang-bang relay is meant to actually engage.
+    assert all(t_sp == HeuristicScheduler.T_SP_FIXED for t_sp in decisions['buildings'].values()), \
+        f"expected every building decision to equal T_SP_FIXED, got {decisions['buildings']}"
+    print("PASS: HeuristicScheduler returns the fixed comfort setpoint for every building")
 
-    # Mode B building's t_in still moves -- but now via passive RC physics
-    # (drift toward outdoor temp) only, since p_hvac stays 0 with no
-    # setpoint decision. Confirms Building.step()'s RC dynamics still run
-    # on their own, independent of any scheduler decision.
+    # Mode B building's t_in should now trend down from its warm t_init
+    # toward T_SP_FIXED under active bang-bang HVAC, not just passively
+    # drift toward outdoor temp.
     b_a_final = sim.buildings.buildings[0].t_in
-    assert b_a_final != b_a_t_init, f"Mode B building t_in did not passively drift from t_init={b_a_t_init}"
-    print(f"PASS: Mode B building t_in passively drifted from {b_a_t_init} to {b_a_final:.3f} (no active HVAC)")
+    assert b_a_final < b_a_t_init, \
+        f"Mode B building t_in should cool from t_init={b_a_t_init} under active HVAC, got {b_a_final}"
+    print(f"PASS: Mode B building t_in cooled from {b_a_t_init} to {b_a_final:.3f} under active HVAC")
 
     b_b = sim.buildings.buildings[1]
     assert b_b.t_in is None, "Mode A building should have no t_in"

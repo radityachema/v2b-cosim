@@ -5,6 +5,10 @@ class HeuristicScheduler(BaseScheduler):
     """Constrained opportunistic discharge rule. See README.md (Algorithm 1)."""
 
     S_RESERVE = 0.2  # TODO: derive from literature -- see README.md
+    T_SP_FIXED = 23.0  # deg C -- placeholder: this scheduler happens to return a fixed
+                       # setpoint for now, not because a constant setpoint is the right
+                       # design, but because a real per-timestep thermal rule hasn't
+                       # been written yet. TODO: replace with an actual decision.
 
     def decide(self, state):
         return {
@@ -59,4 +63,4 @@ class HeuristicScheduler(BaseScheduler):
         return decisions
 
     def _decide_buildings(self, state):
-        return {b['b_id']: None for b in state['buildings']}   # constant -- see README.md
+        return {b['b_id']: self.T_SP_FIXED for b in state['buildings']}

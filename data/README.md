@@ -15,8 +15,25 @@ in case a future scenario wants a simpler non-bespoke loader again.
 ## Fleet data — Chicago Taxi Trips
 
 Source: [Chicago Data Portal](https://data.cityofchicago.org/Transportation/Taxi-Trips/wrvz-psew)
+(Socrata dataset ID `wrvz-psew`).
 
-Download the CSV export and save it as `data/chicago_taxi_trips.csv`.
+`TARGET_DATE` in both scenario files is `2019-07-10` — a summer date, not
+winter. This matters: Mode B's HVAC relay (`simulator/building.py`) is
+cooling-only, so a winter day just coasts the building down to near-freezing
+with HVAC never engaging (confirmed empirically; see the RC thermal model
+section below). Pick any date here, but if you change it, keep it in a
+season the cooling-only relay actually makes sense for, and update
+`TARGET_DATE`/`DOE_MONTH`/`DOE_DAY` together in both scenario files.
+
+The portal's own web UI is slow for large date ranges. Faster: pull directly
+via the Socrata API (no auth needed for this dataset) with
+`data/loaders/pull_taxi_trips.py`, which fetches the day, converts it to
+match the portal's own CSV export column names, and writes
+`data/chicago_taxi_trips.csv` directly:
+
+```bash
+python -m data.loaders.pull_taxi_trips 2019-07-10
+```
 
 ## Building data — DOE Commercial Reference Buildings (used by both scenarios)
 
@@ -64,16 +81,24 @@ Chicago community areas / 250 vehicles (Heuristic/Null only — MILP does not
 solve at this scale, see `scenarios/chicago_scenario.py`'s docstring for the
 stress-test evidence).
 
-## No thermal (Mode B) decision in the published scenarios
+## Thermal (Mode B) status in the published scenarios
 
-Both `scenarios/small_scenario.py` and `scenarios/chicago_scenario.py`
-construct every `Building` with `rc=None` (Mode A) -- AC setpoint is a
-constant for this paper's published checkpoint, not something any of the
-three schedulers decide. `Building.step()` (`simulator/building.py`)
-still supports Mode B (thermal-aware, RC dynamics + bang-bang relay) if
-a future scheduler wants to reintroduce a real thermal decision; that
-capability wasn't removed, only its use by the current scenarios/
-schedulers. If you do populate `rc=...` again, note that a poorly-scaled
-`hvac_max` relative to a building's real load can produce misleading
-results (e.g. a "worse" peak after adding HVAC control) -- check
-parameter scale against the building's actual load range.
+`scenarios/small_scenario.py` and `scenarios/chicago_scenario.py` now
+construct every `Building` with a real `rc` dict (Mode B) -- the bang-bang
+relay and RC temperature update in `Building.step()`
+(`simulator/building.py`) are active. `HeuristicScheduler` and
+`MILPScheduler` both return a fixed comfort setpoint (`T_SP_FIXED = 23.0`
+in each scheduler's class) rather than deciding it per timestep --
+"thermal-aware" here means the physics runs, not that any scheduler
+optimizes over it yet. `NullScheduler` still returns `None`
+(no decision), matching its floor-baseline role.
+
+The `a`, `b`, `hvac_max`, `t_init` values in each scenario's `rc_by_node`
+dict are placeholder physics, not derived from the DOE EnergyPlus
+envelope data (that would need parsing the source `.idf` files -- not
+done). `hvac_max` is scaled against each building's own real peak load
+(see the scenario file's comment) so it's at least a plausible share of
+demand, not an arbitrary number -- a poorly-scaled `hvac_max` can produce
+misleading results (e.g. a "worse" peak after adding HVAC control), so
+check parameter scale against the building's actual load range before
+changing it.

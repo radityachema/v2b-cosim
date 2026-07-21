@@ -2,11 +2,13 @@
 activity on the target date, 250 vehicles. This is what "the simulator scales
 to realistic complexity" actually means -- NetworkClass/RideDemandClass/
 FleetClass/BuildingClass have no dependency on small N; only the exact MILP
-scheduler does. Confirmed via a stress-frontier sweep: N=4,V=13 solves to
-proven optimality in 39s, N=5,V=20 plateaus at a flat 5.53% gap even after
-12h (identical bound at 6h and 12h -- a genuine combinatorial wall, not a
-patience problem). MILP is not expected to run here at all; use Heuristic or
-Null. See small_scenario.py for the MILP-provable-optimal companion scenario.
+scheduler does. A stress-frontier sweep against the original winter demand
+data found N=4,V=13 solves to proven optimality in 39s, N=5,V=20 plateaus at
+a flat 5.53% gap even after 12h (identical bound at 6h and 12h -- a genuine
+combinatorial wall, not a patience problem) -- demand volume, not just N/V,
+drives this: the current summer demand data no longer proves optimal even at
+N=4, see small_scenario.py's docstring. MILP is not expected to run here at
+all regardless; use Heuristic or Null.
 Not a general-purpose loader -- see data/loaders/ for that."""
 import math
 from pathlib import Path
@@ -18,13 +20,17 @@ from simulator.ride_demand import RideDemandClass
 from simulator.fleet import FleetClass, Vehicle
 from simulator.building import BuildingClass, Building
 from data.loaders.doe_chicago import load_doe_chicago_load
+from data.loaders.tmy3_weather import load_tmy3_outdoor_temp
 
 # See data/README.md for where to get these files.
 TAXI_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "chicago_taxi_trips.csv"
-TARGET_DATE = "2019-01-02"
+TARGET_DATE = "2019-07-10"  # summer, not winter -- see small_scenario.py's comment
+                            # on this same constant.
 DOE_CHICAGO_DIR = Path(__file__).resolve().parent.parent / "data" / "doe_chicago"
-DOE_MONTH, DOE_DAY = 1, 2  # TMY3 is a synthetic typical year, not tied to a real
-                           # calendar year -- day-of-year chosen to match TARGET_DATE
+TMY3_WEATHER_PATH = (Path(__file__).resolve().parent.parent / "data" / "tmy3_chicago"
+                     / "USA_IL_Chicago.OHare.Intl.AP.725300_TMY3.epw")
+DOE_MONTH, DOE_DAY = 7, 10  # TMY3 is a synthetic typical year, not tied to a real
+                            # calendar year -- day-of-year chosen to match TARGET_DATE
 
 # 77 is not an arbitrary round number -- it's the actual count of distinct
 # Chicago community areas with real pickup/dropoff activity on TARGET_DATE
@@ -190,10 +196,19 @@ def build_scenario():
         for b in BUILDING_NODES
     }
     n_chargers = int(Q_BLDG / P_BAR)
+    # See small_scenario.py for why these RC values are placeholders, not
+    # EnergyPlus-envelope-derived numbers -- same building types, same params.
+    rc_by_node = {
+        1: {'a': 0.0417, 'b': 0.006, 'hvac_max': 50.0, 't_init': 26.0,
+            't_sp_min': 20.0, 't_sp_max': 26.0},   # MediumOffice
+        2: {'a': 0.0417, 'b': 0.006, 'hvac_max': 25.0, 't_init': 26.0,
+            't_sp_min': 20.0, 't_sp_max': 26.0},   # SmallHotel
+    }
+    weather = load_tmy3_outdoor_temp(TMY3_WEATHER_PATH, DOE_MONTH, DOE_DAY)
     buildings = BuildingClass([
         Building(
             b_id=b, load_profile=dict(load_profile[b]), n_chargers=n_chargers,
-            rc=None,
+            rc=rc_by_node[b], weather=dict(weather),
         )
         for b in BUILDING_NODES
     ])

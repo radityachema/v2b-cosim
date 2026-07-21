@@ -1,6 +1,6 @@
 # HeuristicScheduler
 
-Constrained opportunistic discharge rule (fleet); constant, undecided setpoint (buildings).
+Constrained opportunistic discharge rule (fleet); fixed comfort setpoint (buildings).
 
 ## Notation
 
@@ -14,6 +14,7 @@ Constrained opportunistic discharge rule (fleet); constant, undecided setpoint (
 | $\bar{P}_v$ | vehicle $v$'s rated power (max magnitude, charge or discharge) |
 | $\tau_{ij}$ | travel time on arc $(i,j)$, in timesteps |
 | $S^{res}$ | fixed SoC reserve floor (`S_RESERVE` in code) |
+| $T^{sp}$ | fixed comfort setpoint applied to every building (`T_SP_FIXED` in code) |
 
 ## Algorithm 1 -- HeuristicScheduler.decide
 
@@ -39,7 +40,7 @@ for v in V:                                                  # vehicle order fix
     else:
         (arc_v(t), p_v(t)) <- (None, +P̄_v)                    # charge
 
-t_sp_b(t) <- None  for all b in N^B                           # no thermal decision -- constant
+t_sp_b(t) <- T^sp  for all b in N^B                           # fixed comfort setpoint, not decided per-timestep
 return {(arc_v(t), p_v(t))}_v in V, {t_sp_b(t)}_b in N^B
 ```
 
@@ -81,8 +82,8 @@ $$P_{v,i,t} = \begin{cases} -\bar{P}_v & \text{if } S_{v,t} \geq S^{res} \quad \
         \State $(arc_v(t), p_v(t)) \gets (\varnothing,\ +\bar{P}_v)$ \Comment{charge}
     \EndIf
 \EndFor
-\State $t^{sp}_b(t) \gets \varnothing \quad \forall b \in \mathcal{N}^B$
-\Comment{no thermal decision -- constant, out of scope for this paper}
+\State $t^{sp}_b(t) \gets T^{sp} \quad \forall b \in \mathcal{N}^B$
+\Comment{fixed comfort setpoint, not decided per-timestep}
 \State \Return $\{(arc_v(t), p_v(t))\}_{v \in \mathcal{V}}$, $\{t^{sp}_b(t)\}_{b \in \mathcal{N}^B}$
 \end{algorithmic}
 \end{algorithm}

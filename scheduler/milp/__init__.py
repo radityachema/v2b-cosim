@@ -9,6 +9,12 @@ from scheduler.milp._model import build_and_solve_extended
 
 
 class MILPScheduler(BaseScheduler):
+    T_SP_FIXED = 23.0  # deg C -- placeholder: this scheduler happens to return a fixed
+                       # setpoint for now, not because a constant setpoint is the right
+                       # design, but because the MILP formulation doesn't model thermal
+                       # decisions yet (see README.md). TODO: replace with an actual
+                       # decision, whether via the MILP itself or a wrapper rule.
+
     def __init__(self, scenario, time_limit=300, verbose=False, plan_path=None):
         if plan_path is not None and Path(plan_path).exists():  # cached plan -- skip re-solve
             with open(plan_path, 'rb') as f:
@@ -64,7 +70,7 @@ class MILPScheduler(BaseScheduler):
             self._fleet_plan.get((v['v_id'], t), {'arc': None, 'p': 0.0})
             for v in state['fleet']
         ]
-        buildings = {b['b_id']: None for b in state['buildings']}  # no thermal decision -- see README.md
+        buildings = {b['b_id']: self.T_SP_FIXED for b in state['buildings']}
         return {'fleet': fleet, 'buildings': buildings}
 
     def _extract_fleet_plan(self, m, scenario):
