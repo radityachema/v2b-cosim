@@ -6,6 +6,7 @@ __pycache__/
 data/chicago_taxi_trips.csv
 data/bdg2/
 data/doe_chicago/
+data/tmy3_chicago/
 outputs/
 data/*.pkl
 

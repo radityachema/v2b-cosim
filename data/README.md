@@ -69,6 +69,22 @@ a real building's charger count doesn't scale with the city's total fleet
 size), not building-vs-fleet power matching. (LargeOffice peaks ~1658 kW,
 SmallOffice ~20 kW — both were tried and rejected as poor fits at V=13.)
 
+## Weather data — TMY3 outdoor temperature (used by both scenarios)
+
+Source: [climate.onebuilding.org](https://climate.onebuilding.org) →
+North and Central America → USA → Illinois → Chicago-O'Hare Intl. AP,
+station 725300, TMY3 — the same station as the building load data above.
+Citation: NREL, "Users Manual for TMY3 Data Sets," NREL/TP-581-43156, 2008.
+
+Download the `.epw` file from the zip and save as
+`data/tmy3_chicago/USA_IL_Chicago.OHare.Intl.AP.725300_TMY3.epw`.
+
+Loader: `data/loaders/tmy3_weather.py → load_tmy3_outdoor_temp(path, month, day)`.
+Returns `{15-min timestep index (0-95): degC}`, same interpolation/hour-24
+convention as `doe_chicago.py`. Feeds `Building.step()`'s RC temperature
+update (see "Thermal (Mode B) status" below) — without it, outdoor
+temperature silently falls back to a hardcoded 30 degC constant.
+
 ## Shared clock
 
 Both scenarios now run at `T=96`, `dt=0.25` (15-min) — the DOE building load
