@@ -1,14 +1,6 @@
-"""Full city-scale Chicago scenario: all 77 real community areas with taxi
-activity on the target date, 250 vehicles. This is what "the simulator scales
-to realistic complexity" actually means -- NetworkClass/RideDemandClass/
-FleetClass/BuildingClass have no dependency on small N; only the exact MILP
-scheduler does. A stress-frontier sweep against the original winter demand
-data found N=4,V=13 solves to proven optimality in 39s, N=5,V=20 plateaus at
-a flat 5.53% gap even after 12h (identical bound at 6h and 12h -- a genuine
-combinatorial wall, not a patience problem) -- demand volume, not just N/V,
-drives this: the current summer demand data no longer proves optimal even at
-N=4, see small_scenario.py's docstring. MILP is not expected to run here at
-all regardless; use Heuristic or Null.
+"""Full city-scale Chicago scenario: 77 community areas, 250 vehicles.
+MILP is not expected to solve at this scale -- use Heuristic or Null (see
+small_scenario.py for the MILP-frontier scenario).
 Not a general-purpose loader -- see data/loaders/ for that."""
 import math
 from pathlib import Path
@@ -24,29 +16,20 @@ from data.loaders.tmy3_weather import load_tmy3_outdoor_temp
 
 # See data/README.md for where to get these files.
 TAXI_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "chicago_taxi_trips.csv"
-TARGET_DATE = "2019-07-10"  # summer, not winter -- see small_scenario.py's comment
-                            # on this same constant.
+TARGET_DATE = "2019-07-10"  # summer -- see small_scenario.py
 DOE_CHICAGO_DIR = Path(__file__).resolve().parent.parent / "data" / "doe_chicago"
 TMY3_WEATHER_PATH = (Path(__file__).resolve().parent.parent / "data" / "tmy3_chicago"
                      / "USA_IL_Chicago.OHare.Intl.AP.725300_TMY3.epw")
-DOE_MONTH, DOE_DAY = 7, 10  # TMY3 is a synthetic typical year, not tied to a real
-                            # calendar year -- day-of-year chosen to match TARGET_DATE
+DOE_MONTH, DOE_DAY = 7, 10  # TMY3 typical year; day-of-year matches TARGET_DATE
 
-# 77 is not an arbitrary round number -- it's the actual count of distinct
-# Chicago community areas with real pickup/dropoff activity on TARGET_DATE
-# (verified directly against the raw data), i.e. every active area, not a
-# curated subset.
-N_ACTIVE = 77
+N_ACTIVE = 77  # every Chicago community area active on TARGET_DATE, not a curated subset
 DEPOT = 0                # node 0 = highest-volume area = depot
 BUILDING_NODES = [1, 2]  # nodes 1, 2 = 2nd/3rd highest-volume areas; 1=MediumOffice, 2=SmallHotel
 T = 96                   # 15-min resolution (hourly DOE data linearly interpolated -- see
                          # data/loaders/doe_chicago.py)
 DT = 0.25
 
-# V/N_ACTIVE kept at the same ~3.25 ratio as small_scenario.py's V=13/N=4.
-# lam=1.0 (100% demand-service) kept fixed for consistency with
-# small_scenario.py, even though only Heuristic/Null are expected to run here.
-V = 250
+V = 250  # same V/N_ACTIVE ratio as small_scenario.py; lam=1.0 kept for consistency
 
 E_CAP = 41.3
 EPS = 0.15
@@ -76,9 +59,8 @@ def _haversine_miles_and_tau(lon1, lat1, lon2, lat2):
 
 
 def build_scenario():
-    """Builds the scenario dict, including MILP-specific fields sharing this same
-    network/fleet/demand data (MILP fields are present for interface consistency
-    with small_scenario.py, not because MILP is expected to solve this scale)."""
+    """Builds the scenario dict; MILP fields included for interface
+    consistency with small_scenario.py, not because MILP solves this scale."""
     df = pd.read_csv(TAXI_CSV_PATH, low_memory=False)
     df['Trip Start Timestamp'] = pd.to_datetime(df['Trip Start Timestamp'])
     day = df[df['Trip Start Timestamp'].dt.date == pd.Timestamp(TARGET_DATE).date()].copy()
@@ -183,21 +165,15 @@ def build_scenario():
         for i in range(V)
     ])
 
-    # node 1 = MediumOffice, node 2 = SmallHotel -- two distinct DOE reference
-    # building types, both from the Chicago-O'Hare TMY3 station. Q_bldg/n_chargers
-    # is unchanged from small_scenario.py -- a real building's charger count
-    # doesn't scale with the city's total fleet size, so at V=250 this is a
-    # genuinely binding constraint (unlike at V=13, where V*P_bar < Q_bldg made
-    # it decorative). Only Heuristic/Null are expected to run this scenario --
-    # see module docstring.
+    # node 1 = MediumOffice, node 2 = SmallHotel. Q_bldg/n_chargers unchanged
+    # from small_scenario.py -- a genuinely binding constraint at V=250.
     doe_file_by_node = {1: 'MediumOffice.csv', 2: 'SmallHotel.csv'}
     load_profile = {
         b: load_doe_chicago_load(DOE_CHICAGO_DIR / doe_file_by_node[b], DOE_MONTH, DOE_DAY)
         for b in BUILDING_NODES
     }
     n_chargers = int(Q_BLDG / P_BAR)
-    # See small_scenario.py for why these RC values are placeholders, not
-    # EnergyPlus-envelope-derived numbers -- same building types, same params.
+    # Placeholder RC params, same as small_scenario.py (same building types).
     rc_by_node = {
         1: {'a': 0.0417, 'b': 0.006, 'hvac_max': 50.0, 't_init': 26.0,
             't_sp_min': 20.0, 't_sp_max': 26.0},   # MediumOffice

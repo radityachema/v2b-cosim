@@ -1,12 +1,7 @@
-"""Small quick-start scenario: real Chicago Taxi demand + real DOE/EnergyPlus
-Chicago-O'Hare building load (two building types as two buildings), 13
-vehicles, 3 nodes. On this summer date, the MILP no longer proves optimal
-within a practical time budget -- 600s lands at a 2.24% gap (best incumbent
-114.6242, proven bound 112.0581), not proven-optimal like the original
-winter/N=4 configuration (39s). Not treated as a problem: this paper makes
-no claim about MILP solve time or scalability -- see chicago_scenario.py
-docstring. See chicago_scenario.py for the full ~77-node
-city-scale version -- MILP doesn't scale there at all, Heuristic/Null do."""
+"""Small quick-start scenario: real Chicago Taxi demand + DOE/EnergyPlus
+Chicago-O'Hare building load, 13 vehicles, 3 nodes. MILP lands at a ~2.24%
+gap here, not proven-optimal. See chicago_scenario.py for
+the full city-scale version."""
 import math
 from pathlib import Path
 
@@ -21,35 +16,20 @@ from data.loaders.tmy3_weather import load_tmy3_outdoor_temp
 
 # See data/README.md for where to get these files.
 TAXI_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "chicago_taxi_trips.csv"
-TARGET_DATE = "2019-07-10"  # summer, not winter -- the Mode B bang-bang relay is
-                            # cooling-only (see simulator/building.py), so a winter
-                            # day would just coast the building down to near-freezing
-                            # with HVAC never engaging. See data/README.md.
+TARGET_DATE = "2019-07-10"  # summer -- the HVAC relay is cooling-only, see data/README.md
 DOE_CHICAGO_DIR = Path(__file__).resolve().parent.parent / "data" / "doe_chicago"
 TMY3_WEATHER_PATH = (Path(__file__).resolve().parent.parent / "data" / "tmy3_chicago"
                      / "USA_IL_Chicago.OHare.Intl.AP.725300_TMY3.epw")
-DOE_MONTH, DOE_DAY = 7, 10  # TMY3 is a synthetic typical year, not tied to a real
-                            # calendar year -- day-of-year chosen to match TARGET_DATE
+DOE_MONTH, DOE_DAY = 7, 10  # TMY3 typical year; day-of-year matches TARGET_DATE
 
-N_ACTIVE = 3            # top-3 Chicago community areas by trip volume -- reduced from 4
-                        # for the summer date (2019-07-10): summer demand volume is much
-                        # higher than the original winter data at the same N_ACTIVE, so
-                        # N_ACTIVE=4 no longer solves to proven optimality (869 demands,
-                        # timed out with zero feasible solutions at 300s). N_ACTIVE=3 gives
-                        # 493 demands, close to the original 474 -- see data/README.md.
+N_ACTIVE = 3  # top-3 areas by trip volume; reduced from 4, see data/README.md
 DEPOT = 0                # node 0 = highest-volume area = depot
 BUILDING_NODES = [1, 2]  # nodes 1, 2 = 2nd/3rd highest-volume areas; 1=MediumOffice, 2=SmallHotel
 T = 96                   # 15-min resolution (hourly DOE data linearly interpolated -- see
                          # data/loaders/doe_chicago.py)
 DT = 0.25
 
-# lam=1.0 (100% demand-service) kept fixed -- not relaxed. V=13, N_ACTIVE=3 on
-# this summer date lands at a 2.24% gap after 600s (not proven-optimal -- see
-# module docstring). The original winter/N=4 frontier (proven-optimal, 39s)
-# doesn't hold here: summer demand volume is higher at the same N_ACTIVE, and
-# demand count (not just N/V) drives MILP difficulty. See chicago_scenario.py
-# for the city-scale version this doesn't attempt to match.
-V = 13
+V = 13  # lam=1.0 kept fixed; MILP gap here, see module docstring
 
 E_CAP = 41.3
 EPS = 0.15
@@ -185,24 +165,16 @@ def build_scenario():
         for i in range(V)
     ])
 
-    # node 1 = MediumOffice, node 2 = SmallHotel -- two distinct DOE reference
-    # building types, both from the Chicago-O'Hare TMY3 station, picked so
-    # their peak load is commensurate with this fleet's total power capacity
-    # (V * P_bar = 130 kW): MediumOffice peaks ~172.8 kW, SmallHotel ~111.9 kW
-    # on the summer date used here (2019-07-10).
+    # node 1 = MediumOffice, node 2 = SmallHotel -- peak loads (~173/112 kW)
+    # roughly match fleet capacity (V * P_bar = 130 kW)
     doe_file_by_node = {1: 'MediumOffice.csv', 2: 'SmallHotel.csv'}
     load_profile = {
         b: load_doe_chicago_load(DOE_CHICAGO_DIR / doe_file_by_node[b], DOE_MONTH, DOE_DAY)
         for b in BUILDING_NODES
     }
     n_chargers = int(Q_BLDG / P_BAR)
-    # First-order RC thermal params (Mode B) -- placeholder physics, not
-    # derived from the DOE EnergyPlus envelope data (that would need parsing
-    # the source .idf files, not done yet). tau=R*C=6h chosen as a generic
-    # mid-size-commercial time constant -> a=dt/tau. hvac_max scaled to each
-    # building's own peak load (see comment above) so it's a plausible share
-    # of real demand, not an arbitrary number -- see data/README.md's warning
-    # about mis-scaled hvac_max producing misleading results.
+    # Placeholder RC thermal params (not derived from real envelope data),
+    # hvac_max scaled to each building's peak load -- see data/README.md
     rc_by_node = {
         1: {'a': 0.0417, 'b': 0.006, 'hvac_max': 50.0, 't_init': 26.0,
             't_sp_min': 20.0, 't_sp_max': 26.0},   # MediumOffice
