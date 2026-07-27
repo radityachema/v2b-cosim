@@ -159,8 +159,10 @@ def plot_triple_panel(p_load_hist, p_grid_hist, node_hist, arc_hist, p_hist,
     ax_load.set_xticks(tick_x)
     ax_load.set_xticklabels([])
     ax_load.set_xlim(0, max(hours))
-    # anchored above axes -- an in-axes corner can collide with the load curve depending on scenario
-    ax_load.set_title("A   Building load vs. grid draw", loc="left", fontsize=9, pad=22)
+    # anchored above axes -- an in-axes corner can collide with the load curve depending on scenario.
+    # pad is taller than panel B/C's titles: this legend wraps to 2 rows (ncol=2, 4 entries),
+    # so it needs more clearance or the title text renders through it.
+    ax_load.set_title("A   Building load vs. grid draw", loc="left", fontsize=9, pad=34)
     ax_load.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), fontsize=7,
                     ncol=2, framealpha=0.9, borderaxespad=0.2)
 
