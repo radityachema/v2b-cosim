@@ -1,5 +1,6 @@
 """Interactive demo: pick a scenario + scheduler, run one Simulator loop.
 Add new schedulers to SCHEDULERS below. See tests/test_heuristic.py for a non-interactive check."""
+from functools import partial
 from pathlib import Path
 
 from simulator import Simulator
@@ -8,6 +9,7 @@ from scheduler.heuristic import HeuristicScheduler
 from scheduler.milp import MILPScheduler
 from scenarios.small_scenario import build_scenario as build_small_scenario
 from scenarios.chicago_scenario import build_scenario as build_chicago_scenario
+from scenarios.scaled_scenario import build_scenario as build_scaled_scenario, n_buildings_for, default_vehicles
 from evaluation import metrics
 from evaluation.plotting import plot_triple_panel, plot_comparison, summarize_fleet
 
@@ -20,6 +22,7 @@ from evaluation.plotting import plot_triple_panel, plot_comparison, summarize_fl
 SCENARIOS = {
     'small': (build_small_scenario, "13 vehicles, 4 nodes -- MILP solves to proven optimal in ~39s"),
     'chicago': (build_chicago_scenario, "250 vehicles, 77 nodes (full city scale) -- Heuristic/Null only, MILP does not solve here"),
+    'scaled': (build_scaled_scenario, "you choose the node count N; buildings = ceil(2N/3) (max 16 DOE types), vehicles ~3.25 per node"),
 }
 
 SCHEDULERS = {
@@ -120,6 +123,11 @@ if __name__ == '__main__':
         print(f"  {key}: {desc}")
     scenario_name = _choose(SCENARIOS)
     build_scenario = SCENARIOS[scenario_name][0]
+    if scenario_name == 'scaled':
+        n_nodes = int(input("Number of nodes N (>= 2) > ").strip())
+        print(f"  -> {n_buildings_for(n_nodes)} buildings, {default_vehicles(n_nodes)} vehicles")
+        build_scenario = partial(build_scaled_scenario, n_nodes=n_nodes)
+        scenario_name = f"scaled_N{n_nodes}"  # keeps cached MILP plans per N separate
 
     print("Which scheduler?")
     for key in list(SCHEDULERS) + ['all']:
