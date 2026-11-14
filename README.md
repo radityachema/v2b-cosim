@@ -69,7 +69,7 @@ python -m tests.test_adversarial
 python -m tests.test_scaled_scenario
 ```
 
-## Quick start
+### Menu (simplest)
 
 ```bash
 python menu.py
