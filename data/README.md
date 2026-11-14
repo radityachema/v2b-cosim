@@ -55,6 +55,16 @@ Download `RefBldgMediumOfficeNew2004_v1.3_7.1_5A_USA_IL_CHICAGO-OHARE.csv`
 and `RefBldgSmallHotelNew2004_v1.3_7.1_5A_USA_IL_CHICAGO-OHARE.csv`, save as
 `data/doe_chicago/MediumOffice.csv` and `data/doe_chicago/SmallHotel.csv`.
 
+`small` and `chicago` need only those two. `scaled_scenario.py` assigns a DOE
+type to every building and may need all 16: download each
+`RefBldg<Type>New2004_v1.3_7.1_5A_USA_IL_CHICAGO-OHARE.csv` and save it as
+`data/doe_chicago/<Type>.csv` (LargeOffice, Hospital, SecondarySchool,
+LargeHotel, SuperMarket, PrimarySchool, MediumOffice, OutPatient, SmallHotel,
+StandaloneRetail, StripMall, Warehouse, FullServiceRestaurant,
+MidriseApartment, QuickServiceRestaurant, SmallOffice). The scaled scenario
+sets `hvac_max` to 16% of each type's annual peak (placeholder physics, like
+the other RC values).
+
 Loader: `data/loaders/doe_chicago.py → load_doe_chicago_load(path, month, day)`.
 Returns `{15-min timestep index (0-95): kW}`, linearly interpolated from the
 native hourly data (see the loader's docstring for the EnergyPlus hour-24

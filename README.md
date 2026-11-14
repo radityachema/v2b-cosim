@@ -39,6 +39,9 @@ scenarios/
                         gap in a practical time budget, not proven-optimal; this paper
                         makes no claim about MILP solve time or scalability
   chicago_scenario.py  full city scale, 77 nodes, 250 vehicles -- Heuristic/Null only
+  scaled_scenario.py   you choose the node count N: buildings = min(ceil(2N/3), 16, N-1),
+                        DOE types assigned by descending annual peak, vehicles ~3.25 per
+                        node (override with n_vehicles) -- Heuristic/Null at larger N
 docs/Architecture.png  system diagram
 ```
 
@@ -56,13 +59,14 @@ Download the two real datasets (see [data/README.md](data/README.md) for links/p
 python runner.py
 ```
 
-Pick a scenario (`small` or `chicago`), a scheduler (`null`, `heuristic`, `milp`, or `all`), and whether to save a plot. Prints ΔP, η_v2b, φ_i, ρ, and total energy discharged.
+Pick a scenario (`small`, `chicago`, or `scaled` -- which then asks for the node count N and prints the resulting building and vehicle counts), a scheduler (`null`, `heuristic`, `milp`, or `all`), and whether to save a plot. Prints ΔP, η_v2b, φ_i, ρ, and total energy discharged.
 
 For a fast, dependency-free correctness check instead:
 
 ```bash
 python -m tests.test_heuristic
 python -m tests.test_adversarial
+python -m tests.test_scaled_scenario
 ```
 
 ## Plug in your own scheduler
@@ -82,7 +86,7 @@ class MyScheduler(BaseScheduler):
 
 ## Status
 
-`NullScheduler`, `HeuristicScheduler`, `MILPScheduler` all run against `small`. `chicago` runs `Null`/`HeuristicScheduler` only — MILP doesn't scale there. Both use λ=1.0 (100% demand-service floor). Both scenarios use a summer date (2019-07-10) — Mode B's bang-bang HVAC relay is cooling-only, so a winter date leaves it permanently off (see `data/README.md`). `HeuristicScheduler` and `MILPScheduler` currently each return a fixed comfort setpoint (`T_SP_FIXED = 23.0`) instead of a real per-timestep thermal decision -- a placeholder pending an actual rule, not a design choice (see the `TODO` in each scheduler). `NullScheduler` still returns `None`.
+`NullScheduler`, `HeuristicScheduler`, `MILPScheduler` all run against `small`. `chicago` runs `Null`/`HeuristicScheduler` only — MILP doesn't scale there. `scaled` (any N, buildings = ⌈2N/3⌉ capped at the 16 DOE types) was tested with `Null`/`HeuristicScheduler` at N=3 and N=11; `MILPScheduler` has not been tried on it. All three scenarios use λ=1.0 (100% demand-service floor) and a summer date (2019-07-10) — Mode B's bang-bang HVAC relay is cooling-only, so a winter date leaves it permanently off (see `data/README.md`). `HeuristicScheduler` and `MILPScheduler` currently each return a fixed comfort setpoint (`T_SP_FIXED = 23.0`) instead of a real per-timestep thermal decision -- a placeholder pending an actual rule, not a design choice (see the `TODO` in each scheduler). `NullScheduler` still returns `None`.
 
 | Scenario | Scheduler | ρ | ΔP (kW) | Energy discharged | SoC conservation error |
 |---|---|---|---|---|---|
