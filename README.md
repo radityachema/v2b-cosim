@@ -39,7 +39,7 @@ scenarios/
                         gap in a practical time budget, not proven-optimal; this paper
                         makes no claim about MILP solve time or scalability
   chicago_scenario.py  full city scale, 77 nodes, 250 vehicles -- Heuristic/Null only
-  scaled_scenario.py   you choose the node count N: buildings = min(ceil(2N/3), 16, N-1),
+  scaled_scenario.py   you choose the node count N: buildings = min(ceil(2N/3), 16, N-1) by default, or any 1..N-1 via n_buildings,
                         DOE types assigned by descending annual peak, vehicles ~3.25 per
                         node (override with n_vehicles) -- Heuristic/Null at larger N
 docs/Architecture.png  system diagram
@@ -68,6 +68,14 @@ python -m tests.test_heuristic
 python -m tests.test_adversarial
 python -m tests.test_scaled_scenario
 ```
+
+## Quick start
+
+```bash
+python menu.py
+```
+
+A small terminal menu (New run / Settings / Past runs / Quit). In Settings pick the scenario (`toy`, `small`, `chicago`, `scaled`), and for `scaled` the number of nodes, buildings (1 to N-1; default ceil(2N/3), DOE types reused cyclically beyond 16) and vehicles, plus the scheduler (`null`, `heuristic`, `milp`; MILP only for `small` and small `scaled`). Each run writes its own folder `outputs/<date>_<time>_<scheduler>_<scenario>/` with `settings.yaml`, `summary.txt` and the plot. `python runner.py` still works as before.
 
 ## Plug in your own scheduler
 

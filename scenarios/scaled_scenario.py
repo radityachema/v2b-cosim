@@ -2,16 +2,21 @@
 the number of buildings scaled to the system size, as in the joint routing +
 V2B MILP paper (P2).
 
-    build_scenario(n_nodes=11, n_vehicles=None)
+    build_scenario(n_nodes=11, n_vehicles=None, n_buildings=None)
 
 - Nodes: the N highest-trip-volume Chicago community areas on TARGET_DATE
   (node 0 = highest volume = depot).
 - Buildings: nodes 1 .. n_B, with n_B = min(ceil(2N/3), 16, N-1). The cap of 16
   is the number of DOE reference-building types available; N-1 keeps at least
   the depot free of a charger. N=3 gives 2 buildings, N=11 gives 8, N>=24 gives 16.
-- Building types: the k-th highest-volume building node gets the k-th
-  highest-annual-peak DOE type (BUILDING_TYPES_BY_PEAK), the same rule as the
-  MILP paper.
+- n_buildings (optional): any number from 1 to N-1 (depot excluded). With
+  n_buildings=None the rule above applies (the default, unchanged). A count
+  above 16 reuses the 16 DOE types by cycling.
+- Building types: the k-th highest-volume building node (k = 1, 2, ...) gets
+  BUILDING_TYPES_BY_PEAK[(k-1) % 16], the k-th highest-annual-peak DOE type,
+  the same rule as the MILP paper. Beyond 16 buildings the sequence simply
+  wraps: node 17 gets LargeOffice again, node 18 Hospital, and so on, so
+  each type is reused on the next-highest-volume nodes.
 - hvac_max (placeholder physics, like small/chicago): HVAC_FRACTION x the
   type's annual peak load. The other RC parameters are the same placeholders
   used in small_scenario.py.
@@ -67,13 +72,18 @@ def _annual_peak_kw(path):
     return float(pd.read_csv(path, usecols=[_LOAD_COL])[_LOAD_COL].max())
 
 
-def build_scenario(n_nodes=11, n_vehicles=None):
+def build_scenario(n_nodes=11, n_vehicles=None, n_buildings=None):
     if n_nodes < 2:
         raise ValueError("n_nodes must be >= 2 (a depot plus at least one building)")
     V = default_vehicles(n_nodes) if n_vehicles is None else int(n_vehicles)
-    n_b = n_buildings_for(n_nodes)
+    if n_buildings is None:
+        n_b = n_buildings_for(n_nodes)
+    else:
+        n_b = int(n_buildings)
+        if not 1 <= n_b <= n_nodes - 1:
+            raise ValueError(f"n_buildings must be between 1 and N-1 = {n_nodes - 1}, got {n_b}")
     building_nodes = list(range(1, 1 + n_b))
-    building_type = {b: BUILDING_TYPES_BY_PEAK[b - 1] for b in building_nodes}
+    building_type = {b: BUILDING_TYPES_BY_PEAK[(b - 1) % MAX_BUILDINGS] for b in building_nodes}
 
     df = pd.read_csv(TAXI_CSV_PATH, low_memory=False)
     df['Trip Start Timestamp'] = pd.to_datetime(df['Trip Start Timestamp'])

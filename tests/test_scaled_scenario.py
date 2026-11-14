@@ -44,3 +44,22 @@ if __name__ == '__main__':
     # explicit vehicle override
     assert len(build_scenario(n_nodes=3, n_vehicles=13)['vehicles_list']) == 13
     print("PASS: n_vehicles override")
+
+    # --- n_buildings option: any count 1..N-1, types cycle in BUILDING_TYPES_BY_PEAK order
+    sc = build_scenario(n_nodes=20, n_buildings=19)
+    assert sc['building_nodes'] == list(range(1, 20)) and sc['depot'] == 0
+    assert len(sc['buildings'].buildings) == 19
+    types = [sc['building_types'][b] for b in sc['building_nodes']]
+    assert types == (BUILDING_TYPES_BY_PEAK * 2)[:19], types  # node 17 reuses LargeOffice
+    assert build_scenario(n_nodes=6, n_buildings=1)['building_nodes'] == [1]
+    for bad in (0, 6):  # N-1 = 5 is the max; depot never gets a building
+        try:
+            build_scenario(n_nodes=6, n_buildings=bad)
+            raise AssertionError(f"n_buildings={bad} should have been rejected")
+        except ValueError:
+            pass
+    # default (None) is unchanged
+    d = build_scenario(n_nodes=11)
+    assert d['building_nodes'] == list(range(1, 1 + n_buildings_for(11)))
+    _run(build_scenario(n_nodes=8, n_buildings=7), HeuristicScheduler())
+    print("PASS: n_buildings option (cycling, bounds, default unchanged)")
